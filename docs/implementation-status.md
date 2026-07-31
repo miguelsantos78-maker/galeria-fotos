@@ -68,12 +68,55 @@ Limitações conhecidas (ver `docs/decisions/0002` para detalhe):
   oficiais do `@supabase/auth-js`.
 - `lib/db/database.types.ts` foi escrito à mão a partir das migrações;
   substituir por `pnpm db:types` assim que existir um projeto Supabase.
-- `ensureAnonymousSession()` ainda não está ligada a nenhuma página (só
-  acontece quando a Fase 2 implementar a resolução de álbum).
+- `ensureAnonymousSession()` (helper de browser) continua por usar — a
+  Fase 2 decidiu criar a sessão anónima no próprio servidor, dentro de
+  `POST /api/albums/resolve`, para o convidado só precisar de uma
+  chamada (ver `docs/decisions/0003`). O helper fica disponível para um
+  futuro caso em que o cliente precise de garantir sessão antes de
+  outra chamada (por exemplo, Realtime na Fase 5).
 
 ## Fase 2 — Álbuns e partilha
 
-**Estado: por iniciar**
+**Estado: concluída**
+
+- [x] CRUD de álbuns: `server/use-cases/albums.ts` +
+      `app/api/albums/route.ts` + `app/api/albums/[albumId]/route.ts`
+      (criar, listar, ver, atualizar/publicar/arquivar, eliminar
+      idempotente).
+- [x] Links de partilha com PIN (scrypt), expiração e revogação (que
+      também expira sessões já emitidas): `server/use-cases/share-links.ts` + `app/api/albums/[albumId]/share-links/**`.
+- [x] Resolução de link para `album_session`: `POST /api/albums/resolve`
+      cria a sessão anónima do convidado no próprio pedido, se ainda não
+      existir, e troca o token por uma sessão (`server/use-cases/resolve-album.ts`).
+- [x] Página pública `/a/[slug]` com estados de carregamento, PIN,
+      indisponível e vazio (`components/gallery/album-resolver.tsx`) — o
+      segmento `[slug]` transporta o token do link, não `albums.slug`
+      (ver `docs/decisions/0003`).
+- [x] Administração: `/admin/albums` (lista + criação) e
+      `/admin/albums/[albumId]` (edição de estado, eliminação, gestão de
+      links), com React Hook Form + Zod + TanStack Query.
+- [x] Camada de repositórios (`server/repositories/`) com interfaces
+      próprias, permitindo testar os casos de uso com implementações
+      falsas em memória, sem precisar de um Supabase real.
+- [x] Dois bugs reais encontrados e corrigidos durante a implementação
+      (detalhe em `docs/decisions/0003`): `redirect()` apanhado
+      incorretamente por `try/catch` nos Route Handlers (nova
+      `requireAdminApi()`), e um bug de inferência de tipos do
+      `@supabase/supabase-js`/`@supabase/ssr` que fazia `.from(...)`
+      resolver para `never` sem `.schema("public")` explícito.
+- [x] `pnpm check`, `pnpm build` e 74 testes unitários (incluindo os
+      casos de uso) a passar; verificado manualmente com `pnpm start`
+      (redirecionamentos de autenticação, erros da API, renderização das
+      páginas — capturas de ecrã tiradas com o Chromium pré-instalado).
+
+Limitações conhecidas (detalhe em `docs/decisions/0003`):
+
+- Criação de álbuns está implementada mas devolve sempre
+  `GOOGLE_DRIVE_NOT_CONNECTED`/`GOOGLE_DRIVE_INTEGRATION_PENDING` — só
+  fica utilizável quando a Fase 3 (Google Drive) existir.
+- Sem rate limiting no `resolve` (fica para a Fase 7).
+- Sem testes de integração contra Supabase real nem testes E2E
+  Playwright para este fluxo (mesma limitação de ambiente da Fase 1).
 
 ## Fase 3 — Google Drive
 

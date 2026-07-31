@@ -1,0 +1,134 @@
+import "server-only";
+import type { AlbumsRepository } from "@/server/repositories/albums-repository";
+import type { ShareLinksRepository } from "@/server/repositories/share-links-repository";
+import type { AlbumSessionsRepository } from "@/server/repositories/album-sessions-repository";
+import type { ResolveAlbumInput } from "@/lib/validation/share-link";
+import { hashShareToken } from "@/lib/security/tokens";
+import { verifyPin } from "@/lib/security/pin";
+import { AppError } from "@/lib/api/response";
+import { getServerEnv } from "@/lib/env";
+import type {
+  AlbumSessionPermission,
+  AlbumVisibility,
+  Database,
+} from "@/lib/db/database.types";
+
+type AlbumRow = Database["public"]["Tables"]["albums"]["Row"];
+
+const SESSION_TTL_HOURS = 24;
+
+export interface PublicAlbumView {
+  id: string;
+  title: string;
+  description: string | null;
+  visibility: AlbumVisibility;
+  uploadEnabled: boolean;
+  downloadEnabled: boolean;
+  eventStartAt: string | null;
+  eventEndAt: string | null;
+}
+
+export interface ResolveAlbumResult {
+  album: PublicAlbumView;
+  permissions: AlbumSessionPermission[];
+}
+
+interface ResolveDeps {
+  albums: AlbumsRepository;
+  shareLinks: ShareLinksRepository;
+  sessions: AlbumSessionsRepository;
+}
+
+/**
+ * Troca um token de partilha (+ PIN opcional) por uma album_session
+ * (secção 5.2/6.3). Usa sempre a mesma mensagem/código genérico
+ * "ALBUM_LINK_INVALID" para token inexistente, revogado ou expirado, e
+ * para álbum não publicado — nunca revela qual destes casos se aplica
+ * (secção 15).
+ */
+export async function resolveAlbumSession(
+  input: ResolveAlbumInput,
+  ctx: { userId: string },
+  deps: ResolveDeps,
+): Promise<ResolveAlbumResult> {
+  const tokenHash = hashShareToken(
+    input.token,
+    getServerEnv().APP_TOKEN_PEPPER,
+  );
+  const link = await deps.shareLinks.findByTokenHash(tokenHash);
+
+  if (!link || !isLinkCurrentlyValid(link)) {
+    throw new AppError(
+      "ALBUM_LINK_INVALID",
+      "Este link não é válido ou já não está disponível.",
+      404,
+    );
+  }
+
+  if (link.pin_hash) {
+    if (!input.pin) {
+      throw new AppError(
+        "ALBUM_PIN_REQUIRED",
+        "Este álbum está protegido por PIN.",
+        401,
+      );
+    }
+    if (!verifyPin(input.pin, link.pin_hash)) {
+      throw new AppError("ALBUM_PIN_INVALID", "PIN incorreto.", 401);
+    }
+  }
+
+  const album = await deps.albums.findById(link.album_id);
+  if (!album || album.status !== "published") {
+    throw new AppError(
+      "ALBUM_LINK_INVALID",
+      "Este link não é válido ou já não está disponível.",
+      404,
+    );
+  }
+
+  const permissions = album.upload_enabled
+    ? link.permissions
+    : link.permissions.filter((permission) => permission !== "upload");
+
+  const sessionExpiresAt = new Date(
+    Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000,
+  );
+  const linkExpiresAt = link.expires_at ? new Date(link.expires_at) : null;
+  const expiresAt =
+    linkExpiresAt && linkExpiresAt < sessionExpiresAt
+      ? linkExpiresAt.toISOString()
+      : sessionExpiresAt.toISOString();
+
+  await deps.sessions.insert({
+    album_id: album.id,
+    user_id: ctx.userId,
+    share_link_id: link.id,
+    permissions,
+    expires_at: expiresAt,
+  });
+
+  return { album: toPublicAlbumView(album), permissions };
+}
+
+function isLinkCurrentlyValid(link: {
+  revoked_at: string | null;
+  expires_at: string | null;
+}): boolean {
+  if (link.revoked_at) return false;
+  if (link.expires_at && new Date(link.expires_at) <= new Date()) return false;
+  return true;
+}
+
+function toPublicAlbumView(album: AlbumRow): PublicAlbumView {
+  return {
+    id: album.id,
+    title: album.title,
+    description: album.description,
+    visibility: album.visibility,
+    uploadEnabled: album.upload_enabled,
+    downloadEnabled: album.download_enabled,
+    eventStartAt: album.event_start_at,
+    eventEndAt: album.event_end_at,
+  };
+}

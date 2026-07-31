@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/dal";
 
 export default async function AdminDashboardPage() {
@@ -10,10 +11,12 @@ export default async function AdminDashboardPage() {
         Sessão iniciada como{" "}
         <strong>{profile.display_name ?? profile.email}</strong>.
       </p>
-      <p className="text-foreground/60 max-w-md text-sm">
-        A gestão de álbuns ainda não está disponível. Esta página será
-        implementada numa fase seguinte do projeto.
-      </p>
+      <Link
+        href="/admin/albums"
+        className="bg-brand-600 hover:bg-brand-700 rounded-full px-5 py-2 text-sm font-medium text-white transition-colors"
+      >
+        Gerir álbuns
+      </Link>
       <form action="/api/auth/signout" method="post">
         <button
           type="submit"

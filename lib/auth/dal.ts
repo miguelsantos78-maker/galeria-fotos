@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/db/supabase-server";
 import { getServerEnv } from "@/lib/env";
 import { isAdmin } from "@/lib/auth/admin";
+import { AppError } from "@/lib/api/response";
 import type { Database } from "@/lib/db/database.types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -33,7 +34,11 @@ export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   if (!user || user.is_anonymous) return null;
 
   const supabase = await createSupabaseServerClient();
+  // .schema("public") explícito: contorna uma resolução de tipos que, sem
+  // isto, faz o cliente Supabase inferir "never" para tabelas (ver
+  // docs/decisions/0003-fase-2-albuns-partilha.md).
   const { data } = await supabase
+    .schema("public")
     .from("profiles")
     .select("*")
     .eq("id", user.id)
@@ -44,8 +49,10 @@ export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
 
 /**
  * Garante que o pedido atual pertence a um administrador. Redireciona
- * para o login caso contrário. Usar no topo de páginas/Route Handlers
- * administrativos — nunca confiar apenas numa verificação no cliente.
+ * para o login caso contrário. Usar apenas em Server Components (Page/
+ * Layout) — `redirect()` funciona lançando um sinal especial que só a
+ * própria framework deve apanhar. Para Route Handlers, usar
+ * `requireAdminApi()`.
  */
 export async function requireAdmin(): Promise<Profile> {
   const profile = await getCurrentProfile();
@@ -60,6 +67,36 @@ export async function requireAdmin(): Promise<Profile> {
     })
   ) {
     redirect("/admin/login");
+  }
+
+  return profile;
+}
+
+/**
+ * Equivalente a `requireAdmin()` para Route Handlers de API: nunca
+ * chama `redirect()` (que devolveria HTML a um cliente que espera
+ * JSON, e que um `try/catch` à volta apanharia incorretamente — ver
+ * a documentação do Next.js sobre `redirect()` em Route Handlers).
+ * Lança `AppError`, que `lib/api/response.ts#jsonError()` converte na
+ * resposta 401 padrão.
+ */
+export async function requireAdminApi(): Promise<Profile> {
+  const profile = await getCurrentProfile();
+  const env = getServerEnv();
+
+  if (
+    !profile ||
+    !isAdmin({
+      email: profile.email,
+      role: profile.role,
+      adminEmails: env.ADMIN_EMAILS,
+    })
+  ) {
+    throw new AppError(
+      "UNAUTHORIZED",
+      "Sessão administrativa necessária.",
+      401,
+    );
   }
 
   return profile;
