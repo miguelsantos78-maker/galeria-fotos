@@ -36,6 +36,20 @@ const serverEnvSchema = publicEnvSchema.extend({
   UPSTASH_REDIS_REST_URL: z.url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
   SENTRY_DSN: z.url().optional(),
+
+  // Lista de bootstrap para o primeiro administrador (secção 6.1): emails
+  // separados por vírgula que são sempre tratados como admin, mesmo antes
+  // de existir alguém com profiles.role = 'admin' na base de dados. Ver
+  // docs/decisions/0002-fase-1-supabase-auth.md.
+  ADMIN_EMAILS: z
+    .string()
+    .optional()
+    .transform((value) =>
+      (value ?? "")
+        .split(",")
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean),
+    ),
 });
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>;

@@ -1,0 +1,6 @@
+-- LiveGallery: dados de seed para desenvolvimento local.
+--
+-- Ainda não há dados de seed — os álbuns/fotografias mockados vivem numa
+-- camada de desenvolvimento isolada em código (ver docs/decisions/), não
+-- na base de dados. Este ficheiro fica pronto para quando fizer sentido
+-- popular dados de exemplo (por exemplo, no fim da Fase 2).

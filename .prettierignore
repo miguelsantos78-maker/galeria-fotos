@@ -4,3 +4,7 @@ coverage
 playwright-report
 test-results
 pnpm-lock.yaml
+
+# Especificação fonte — nunca reformatar automaticamente.
+CLAUDE.md
+AGENTS.md

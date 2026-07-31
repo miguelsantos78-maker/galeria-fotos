@@ -31,7 +31,45 @@ ou mockados. As pastas correspondentes existem como esqueleto (com
 
 ## Fase 1 — Supabase e autenticação
 
-**Estado: por iniciar**
+**Estado: concluída**
+
+- [x] Clientes Supabase browser/server/admin (`lib/db/supabase-*.ts`),
+      seguindo o padrão atual `getAll`/`setAll` do `@supabase/ssr`.
+- [x] Migrações iniciais completas (`supabase/migrations/0001`–`0004`):
+      esquema da secção 7, trigger de provisionamento de perfis, RLS da
+      secção 8 e bucket privado `photo-previews`.
+- [x] Login administrativo com Google via Supabase Auth
+      (`/admin/login`, `/api/auth/callback`, `/api/auth/signout`),
+      protegido no servidor por `requireAdmin()` (`lib/auth/dal.ts`) e
+      opticamente por `proxy.ts`/`lib/auth/update-session.ts`.
+- [x] Bootstrap de administradores via `ADMIN_EMAILS` +
+      `profiles.role = 'admin'` (ver `docs/decisions/0002`).
+- [x] Helper de anonymous sign-in para convidados
+      (`lib/auth/ensureAnonymousSession`), pronto para a Fase 2 ligar à
+      resolução de álbum.
+- [x] RLS validado com 20 testes pgTAP
+      (`supabase/tests/database/0001_row_level_security_test.sql`),
+      cobrindo os 5 cenários da secção 8 mais escalonamento de
+      privilégio, isolamento entre administradores e a distinção entre
+      permissões "view"/"moderate".
+- [x] `pnpm check` e `pnpm build` a passar; testado manualmente com
+      `pnpm start` (redireciona `/admin` → `/admin/login` sem sessão).
+
+Limitações conhecidas (ver `docs/decisions/0002` para detalhe):
+
+- Não existe um projeto Supabase real ligado. Os testes de RLS correram
+  contra Postgres local com uma aproximação mínima dos schemas
+  `auth`/`storage` (`tests/sql/00_supabase_stub.sql`), não contra o
+  stack real do Supabase (`supabase test db` precisa de Docker, que não
+  está disponível neste ambiente). Recomenda-se voltar a correr
+  `pnpm db:test` num ambiente com Docker antes de produção.
+- Login Google não testado ponta-a-ponta (precisa de credenciais OAuth
+  reais); o fluxo de código foi verificado por leitura e pelos tipos
+  oficiais do `@supabase/auth-js`.
+- `lib/db/database.types.ts` foi escrito à mão a partir das migrações;
+  substituir por `pnpm db:types` assim que existir um projeto Supabase.
+- `ensureAnonymousSession()` ainda não está ligada a nenhuma página (só
+  acontece quando a Fase 2 implementar a resolução de álbum).
 
 ## Fase 2 — Álbuns e partilha
 

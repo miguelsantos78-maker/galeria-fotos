@@ -19,7 +19,7 @@ com dados reais.
    `next lint`, `output: "standalone"` mantido).
 
 2. **Lint**: `next lint` foi removido no Next.js 16; o script `lint`
-   usa o ESLint diretamente (`eslint .`) com a configuração *flat*
+   usa o ESLint diretamente (`eslint .`) com a configuração _flat_
    gerada pelo `create-next-app` (`eslint-config-next`).
 
 3. **Validação de ambiente**: `lib/env.ts` expõe `getServerEnv()` e
