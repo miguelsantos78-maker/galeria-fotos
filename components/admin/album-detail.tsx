@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
 import { ShareLinksManager } from "@/components/admin/share-links-manager";
+import { PhotoModeration } from "@/components/admin/photo-moderation";
 import type { Database } from "@/lib/db/database.types";
 
 type AlbumRow = Database["public"]["Tables"]["albums"]["Row"];
@@ -102,6 +103,8 @@ export function AlbumDetail({ albumId }: { albumId: string }) {
       )}
 
       <ShareLinksManager albumId={albumId} />
+
+      <PhotoModeration albumId={albumId} />
     </div>
   );
 }

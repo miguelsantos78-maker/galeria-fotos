@@ -323,6 +323,28 @@ export function createFakePhotosRepository(
         .sort((a, b) => b.sort_order - a.sort_order)
         .slice(0, limit);
     },
+    async update(id, patch) {
+      const row = rows.find((r) => r.id === id);
+      if (!row) return null;
+      Object.assign(row, patch);
+      return row;
+    },
+    async listForOwner({ albumId, sortBy, limit }) {
+      return rows
+        .filter((row) => row.album_id === albumId && row.deleted_at === null)
+        .sort((a, b) => {
+          const primary =
+            (b[sortBy] ?? "").localeCompare(a[sortBy] ?? "") ||
+            0;
+          return primary !== 0 ? primary : b.sort_order - a.sort_order;
+        })
+        .slice(0, limit);
+    },
+    async listForAlbumIds(albumIds) {
+      return rows.filter(
+        (row) => albumIds.includes(row.album_id) && row.deleted_at === null,
+      );
+    },
   };
 }
 
@@ -359,6 +381,11 @@ export function createFakeUploadJobsRepository(
       if (!row) return null;
       Object.assign(row, patch);
       return row;
+    },
+    async listForAlbumIds(albumIds) {
+      return rows
+        .filter((row) => albumIds.includes(row.album_id))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
     },
   };
 }

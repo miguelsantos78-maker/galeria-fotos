@@ -265,7 +265,48 @@ Limitações conhecidas (detalhe em `docs/decisions/0006`):
 
 ## Fase 6 — Moderação e operações
 
-**Estado: por iniciar**
+**Estado: concluída**
+
+- [x] Aprovar/republicar (`pending_review`/`hidden` → `ready`) e ocultar
+      (`ready` → `hidden`), com transições validadas explicitamente no
+      servidor — nunca aceita um `status` arbitrário do cliente.
+- [x] Destacar (`is_featured`) e definir/remover como capa
+      (`albums.cover_photo_id`), no mesmo `PATCH /api/photos/[photoId]`.
+- [x] Eliminação completa (`DELETE /api/photos/[photoId]`): apaga o
+      original do Drive e os derivados na Storage antes de marcar a
+      linha como eliminada (ordem inversa da criação), idempotente,
+      limpa a capa do álbum se aplicável.
+- [x] Ações em lote (`POST /api/albums/[albumId]/photos/batch`):
+      aprovar/ocultar/eliminar várias fotografias, sequencial, com
+      falhas parciais reportadas por fotografia.
+- [x] Auditoria: todas as ações de moderação/eliminação registadas em
+      `audit_logs`.
+- [x] Listagem de administração
+      (`GET /api/albums/[albumId]/photos/moderation`) separada da
+      listagem pública — nunca reutiliza a mesma lógica de visibilidade
+      de convidado — com ordenação por data de envio ou de captura
+      (esta última ainda inerte, ver limitações).
+- [x] Painel de moderação (`components/admin/photo-moderation.tsx`)
+      embutido na página de detalhe do álbum: seleção em lote, ações
+      por fotografia, indicadores de estado/destaque/capa.
+- [x] Dashboard de administração
+      (`server/use-cases/dashboard.ts#getDashboardStats`) com números
+      reais: álbuns, fotografias, fotografias recentes, envios com
+      erro — substitui a página estática anterior.
+- [x] `pnpm check` (lint + typecheck + 172 testes) e `pnpm build` a
+      passar; verificado manualmente com `pnpm start` (401 correto sem
+      sessão administrativa nos novos endpoints, dashboard continua a
+      redirecionar para login).
+
+Limitações conhecidas (detalhe em `docs/decisions/0007`):
+
+- Sem paginação na listagem de administração (limite fixo de 200).
+- "Ordenar por data de captura" ainda não produz uma ordem diferente,
+  porque `captured_at` continua sempre `null` (Fase 4).
+- Estatísticas do dashboard agregadas em memória, sem `COUNT()`
+  dedicado — aceitável à escala de um MVP.
+- Sem testes de integração/E2E contra Supabase/Google Drive reais
+  (mesma limitação de ambiente das fases anteriores).
 
 ## Fase 7 — Hardening e deploy
 
