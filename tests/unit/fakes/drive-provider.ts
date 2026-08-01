@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import type {
   ConnectionHealth,
   DriveStorageProvider,
@@ -14,6 +15,7 @@ interface FakeDriveState {
   ensureRootFolderCalls: { connectionId: string }[];
   createAlbumFolderCalls: { parentFolderId: string; albumId: string; title: string }[];
   deletedFileIds: string[];
+  originalContentByFileId: Map<string, Buffer>;
 }
 
 /** Adaptador falso para testes (secção 19/22) — não chama a API real do Google. */
@@ -25,6 +27,7 @@ export function createFakeDriveStorageProvider(
     ensureRootFolderCalls: [],
     createAlbumFolderCalls: [],
     deletedFileIds: [],
+    originalContentByFileId: new Map(),
   };
 
   return {
@@ -45,8 +48,11 @@ export function createFakeDriveStorageProvider(
         size: null,
       };
     },
-    async getOriginalStream() {
-      throw new Error("Não implementado no adaptador falso.");
+    async getOriginalStream({ fileId }) {
+      const content =
+        state.originalContentByFileId.get(fileId) ??
+        Buffer.from("conteúdo de teste", "utf8");
+      return Readable.from(content);
     },
     async deleteFile({ fileId }) {
       state.deletedFileIds.push(fileId);

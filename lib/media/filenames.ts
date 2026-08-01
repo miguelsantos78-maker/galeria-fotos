@@ -37,3 +37,25 @@ export function sanitizeOriginalFilename(name: string): string {
   cleaned = cleaned.trim();
   return (cleaned || "sem-nome").slice(0, 255);
 }
+
+function asciiFallbackFilename(name: string): string {
+  let ascii = "";
+  for (const char of name) {
+    const code = char.codePointAt(0) ?? 0;
+    ascii += code >= 32 && code <= 126 && char !== '"' ? char : "_";
+  }
+  return ascii || "ficheiro";
+}
+
+/**
+ * Cabeçalho `Content-Disposition` seguro para nomes com acentos/UTF-8
+ * (RFC 6266 + RFC 5987): `filename` só ASCII como recurso para clientes
+ * antigos, `filename*` com o nome real para os restantes. O nome já
+ * passou por `sanitizeOriginalFilename` antes de chegar aqui, por isso
+ * não contém quebras de linha nem outros caracteres de controlo.
+ */
+export function buildContentDispositionHeader(filename: string): string {
+  const asciiName = asciiFallbackFilename(filename);
+  const encoded = encodeURIComponent(filename);
+  return `attachment; filename="${asciiName}"; filename*=UTF-8''${encoded}`;
+}

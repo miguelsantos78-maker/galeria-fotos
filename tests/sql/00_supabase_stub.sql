@@ -49,6 +49,14 @@ begin
 end;
 $$;
 
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    create publication supabase_realtime;
+  end if;
+end;
+$$;
+
 grant usage on schema public, auth, storage to anon, authenticated, service_role;
 grant all on all tables in schema public, auth, storage to service_role;
 grant all on all sequences in schema public, auth, storage to service_role;

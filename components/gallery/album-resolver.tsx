@@ -76,7 +76,7 @@ export function AlbumResolver({ token }: { token: string }) {
         </Link>
       )}
 
-      <PhotoGrid albumId={album.id} />
+      <PhotoGrid albumId={album.id} downloadEnabled={album.downloadEnabled} />
     </main>
   );
 }

@@ -220,11 +220,48 @@ Limitações conhecidas (detalhe em `docs/decisions/0005`):
 
 ## Fase 5 — Galeria e realtime
 
-**Estado: por iniciar**
+**Estado: concluída**
 
-## Fase 5 — Galeria e realtime
+- [x] Grelha responsiva com layout "masonry" via CSS `columns`
+      (`components/gallery/photo-grid.tsx`), sem nova dependência.
+- [x] Paginação por cursor com carregamento progressivo
+      (`useInfiniteQuery` + `IntersectionObserver`, com "Carregar mais"
+      como alternativa acessível ao scroll automático).
+- [x] Lightbox de ecrã inteiro (`components/gallery/lightbox.tsx`):
+      anterior/seguinte, swipe, setas do teclado, `Escape`, foco preso
+      no modal, foco devolvido ao fechar, transferir (quando
+      `download_enabled`), partilhar link interno (`?photo=<id>`).
+- [x] Modo apresentação como variante do lightbox (avanço automático,
+      respeita `prefers-reduced-motion`).
+- [x] Subscrição Realtime (`lib/realtime/use-photos-realtime.ts`):
+      `postgres_changes` em `photos` filtrado por `album_id`, nunca
+      confia no payload do evento (só invalida e refaz o pedido
+      autorizado), indicador de ligação, fallback de refetch periódico
+      quando desligado, subscrição limpa ao desmontar/mudar de álbum.
+- [x] Migração `0005_realtime.sql` a adicionar `photos` à publicação
+      `supabase_realtime` (vazia por omissão num projeto novo).
+- [x] Dois endpoints implementados agora, que tinham ficado
+      deliberadamente por fazer nas Fases 3/4:
+      `GET /api/media/[photoId]/original` (transmite o original do
+      Drive sem nunca expor tokens/URLs do Google, gated por sessão de
+      álbum + `download_enabled`).
+- [x] Primeiro teste de componente da suíte
+      (`tests/unit/lightbox.test.tsx`), usando `@vitest-environment
+      jsdom` por ficheiro (infraestrutura preparada na Fase 4).
+- [x] `pnpm check` (lint + typecheck + 146 testes) e `pnpm build` a
+      passar; migrações validadas com Postgres local + pgTAP (20 testes
+      de RLS continuam a passar); verificado manualmente com
+      `pnpm start` (códigos de erro corretos sem sessão, deep link
+      `?photo=` não rebenta sem Supabase real ligado).
 
-**Estado: por iniciar**
+Limitações conhecidas (detalhe em `docs/decisions/0006`):
+
+- Sem testes de integração/E2E contra um projeto Supabase real com
+  Realtime ativo (mesma limitação de ambiente das fases anteriores); o
+  critério de saída literal (dois browsers sem recarregar) só pode ser
+  confirmado manualmente com um projeto real.
+- Deep link `?photo=<id>` só encontra a fotografia se já estiver na
+  página carregada.
 
 ## Fase 6 — Moderação e operações
 
