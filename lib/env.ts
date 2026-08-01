@@ -28,7 +28,7 @@ const serverEnvSchema = publicEnvSchema.extend({
     .string()
     .min(16, "APP_TOKEN_PEPPER deve ter pelo menos 16 caracteres."),
 
-  MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(26_214_400),
+  MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(4_000_000),
   MAX_FILES_PER_UPLOAD: z.coerce.number().int().positive().default(50),
   PREVIEW_MAX_EDGE: z.coerce.number().int().positive().default(1600),
   THUMBNAIL_MAX_EDGE: z.coerce.number().int().positive().default(480),

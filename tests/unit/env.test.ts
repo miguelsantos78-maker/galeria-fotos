@@ -34,7 +34,7 @@ describe("env validation", () => {
     expect(env.NEXT_PUBLIC_SUPABASE_URL).toBe(
       validEnv.NEXT_PUBLIC_SUPABASE_URL,
     );
-    expect(env.MAX_UPLOAD_BYTES).toBe(26_214_400);
+    expect(env.MAX_UPLOAD_BYTES).toBe(4_000_000);
     expect(env.MAX_FILES_PER_UPLOAD).toBe(50);
   });
 

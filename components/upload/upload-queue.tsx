@@ -9,9 +9,12 @@ import { apiFetch } from "@/lib/api/client";
  * `MAX_FILES_PER_UPLOAD` em `lib/env.ts` — o browser não tem acesso às
  * variáveis de servidor, por isso só serve de validação rápida no
  * cliente (secção 10.3); o servidor volta sempre a validar os limites
- * reais configurados (`server/use-cases/uploads.ts`).
+ * reais configurados (`server/use-cases/uploads.ts`). Valor baixo por
+ * causa do limite de 4,5 MB por pedido nas Serverless Functions da
+ * Vercel (docs/decisions/0009-deploy-vercel.md) — não é uma restrição
+ * do Google Drive nem do Supabase.
  */
-const MAX_FILE_BYTES = 26_214_400;
+const MAX_FILE_BYTES = 4_000_000;
 const MAX_FILES = 50;
 const MAX_CONCURRENT_UPLOADS = 3;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
