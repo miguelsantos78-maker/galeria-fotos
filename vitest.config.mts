@@ -17,7 +17,14 @@ export default defineConfig({
     },
   },
   test: {
-    environment: "jsdom",
+    // "node", não "jsdom": nenhum teste atual renderiza componentes React
+    // (isso só chega com testes de UI, ainda por escrever) e o jsdom tem um
+    // bug real de cross-realm com `Buffer`/`Uint8Array` — `x instanceof
+    // Uint8Array` falha para um `Buffer` do Node dentro do contexto isolado
+    // do jsdom, o que partiu `file-type` (usado em lib/media/validate-image.ts,
+    // Fase 4). Ficheiros que precisem de DOM podem ativar jsdom por ficheiro
+    // com o comentário `// @vitest-environment jsdom` no topo.
+    environment: "node",
     globals: true,
     setupFiles: ["./tests/unit/setup.ts"],
     include: ["tests/unit/**/*.test.{ts,tsx}"],

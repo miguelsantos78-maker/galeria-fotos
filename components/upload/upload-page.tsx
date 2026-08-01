@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { ApiRequestError } from "@/lib/api/client";
-import { useResolveAlbum } from "./use-resolve-album";
-import { PinGate } from "./pin-gate";
-import { PhotoGrid } from "./photo-grid";
+import { useResolveAlbum } from "@/components/gallery/use-resolve-album";
+import { PinGate } from "@/components/gallery/pin-gate";
+import { UploadQueue } from "./upload-queue";
 
-export function AlbumResolver({ token }: { token: string }) {
+export function UploadPage({ token }: { token: string }) {
   const mutation = useResolveAlbum(token);
 
   const isPinError =
@@ -52,31 +52,42 @@ export function AlbumResolver({ token }: { token: string }) {
   }
 
   const { album, permissions } = mutation.data;
-  const canUpload = permissions.includes("upload");
+
+  if (!permissions.includes("upload")) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-24 text-center">
+        <h1 className="text-foreground text-xl font-semibold">
+          O envio de fotografias não está disponível
+        </h1>
+        <p className="text-foreground/70 max-w-md text-sm">
+          Este link não permite enviar fotografias para o álbum
+          &ldquo;{album.title}&rdquo;.
+        </p>
+        <Link
+          href={`/a/${token}`}
+          className="text-foreground/70 hover:text-foreground text-sm underline"
+        >
+          Voltar ao álbum
+        </Link>
+      </main>
+    );
+  }
 
   return (
-    <main className="flex flex-1 flex-col items-center gap-6 px-6 py-16">
-      <div className="text-center">
-        <h1 className="text-foreground text-3xl font-semibold">
-          {album.title}
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-12">
+      <div>
+        <Link
+          href={`/a/${token}`}
+          className="text-foreground/60 hover:text-foreground text-sm underline"
+        >
+          ← Voltar ao álbum
+        </Link>
+        <h1 className="text-foreground mt-2 text-2xl font-semibold">
+          Enviar fotografias — {album.title}
         </h1>
-        {album.description && (
-          <p className="text-foreground/70 mt-2 max-w-xl">
-            {album.description}
-          </p>
-        )}
       </div>
 
-      {canUpload && (
-        <Link
-          href={`/a/${token}/upload`}
-          className="bg-brand-600 hover:bg-brand-700 rounded-full px-5 py-2 text-sm font-medium text-white transition-colors"
-        >
-          Adicionar fotografias
-        </Link>
-      )}
-
-      <PhotoGrid albumId={album.id} />
+      <UploadQueue albumId={album.id} />
     </main>
   );
 }

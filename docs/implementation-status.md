@@ -168,6 +168,58 @@ Limitações conhecidas (detalhe em `docs/decisions/0004`):
 
 ## Fase 4 — Upload e processamento
 
+**Estado: concluída**
+
+- [x] UI de seleção e fila (`components/upload/upload-queue.tsx`):
+      seleção múltipla, arrastar e largar, captura pela câmara no
+      telemóvel, até 3 envios simultâneos, progresso por ficheiro via
+      XHR, cancelar e tentar novamente, mensagens de erro por ficheiro,
+      aviso de consentimento, região ARIA para progresso.
+- [x] Endpoint de upload em dois passos (secção 14):
+      `POST /api/albums/[albumId]/uploads` (inicia, cria `upload_jobs`)
+      e `POST /api/albums/[albumId]/uploads/[uploadId]/complete`
+      (recebe os bytes, valida tudo outra vez no servidor, envia o
+      original ao Drive, processa e grava `photos`).
+- [x] Processamento de imagem (`lib/media/`): validação por assinatura
+      binária (`file-type`), limite de decompression bomb, rotação
+      EXIF, preview (1600px) e thumbnail (480px) em WebP sem EXIF
+      (`sharp`), sha256 do original com deteção de duplicados,
+      blurhash.
+- [x] Nomes seguros para os originais no Drive; nome original mantido só
+      como metadado.
+- [x] Estados e tratamento de erros: `upload_jobs` acompanha o envio em
+      curso; falhas a meio limpam o que já tiver sido criado no Drive/
+      Storage (nunca deixam ficheiros órfãos ou uma fotografia
+      "publicada" sem pasta/preview).
+- [x] Limites: `MAX_UPLOAD_BYTES` validado no cliente e duas vezes no
+      servidor; `MAX_FILES_PER_UPLOAD` no cliente.
+- [x] Grelha mínima de fotografias (`GET /api/albums/[albumId]/photos`,
+      `components/gallery/photo-grid.tsx`) com paginação por cursor e
+      URLs assinados de curta duração — prova o critério de saída da
+      fase; a galeria completa é a Fase 5.
+- [x] Bug de ambiente de testes encontrado e corrigido: `vitest` com
+      `environment: "jsdom"` partia `file-type` (`Buffer` não é
+      `instanceof` o `Uint8Array` do realm do jsdom); trocado para
+      `"node"` por omissão (detalhe em `docs/decisions/0005`).
+- [x] `pnpm check` (lint + typecheck + 129 testes) e `pnpm build` a
+      passar; verificado manualmente com `pnpm start` (códigos de erro
+      corretos sem sessão, páginas não rebentam sem Supabase real
+      ligado).
+
+Limitações conhecidas (detalhe em `docs/decisions/0005`):
+
+- Sem upload retomável — um único pedido `multipart/form-data` por
+  ficheiro; fica como tarefa explícita antes de aceitar ficheiros
+  grandes em produção (tal como o `CLAUDE.md` já previa).
+- Sem rate limiting por IP/sessão/álbum (fica para a Fase 7).
+- Mensagem de consentimento estática, não configurável por álbum.
+- `captured_at` não é extraído do EXIF (não pedido explicitamente pela
+  secção 13; evita mais uma dependência).
+- Sem testes de integração contra Supabase/Google Drive reais (mesma
+  limitação de ambiente das fases anteriores).
+
+## Fase 5 — Galeria e realtime
+
 **Estado: por iniciar**
 
 ## Fase 5 — Galeria e realtime

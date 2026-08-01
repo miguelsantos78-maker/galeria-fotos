@@ -8,6 +8,10 @@ type AlbumSessionInsert =
 export interface AlbumSessionsRepository {
   insert(input: AlbumSessionInsert): Promise<AlbumSessionRow>;
   expireByShareLink(shareLinkId: string): Promise<void>;
+  findValidForUser(
+    albumId: string,
+    userId: string,
+  ): Promise<AlbumSessionRow | null>;
 }
 
 export function createAlbumSessionsRepository(
@@ -35,6 +39,21 @@ export function createAlbumSessionsRepository(
         .gt("expires_at", new Date().toISOString());
 
       if (error) throw error;
+    },
+
+    async findValidForUser(albumId, userId) {
+      const { data, error } = await db
+        .from("album_sessions")
+        .select("*")
+        .eq("album_id", albumId)
+        .eq("user_id", userId)
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
     },
   };
 }
