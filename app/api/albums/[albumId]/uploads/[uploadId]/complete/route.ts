@@ -9,6 +9,7 @@ import { createAuditLogRepository } from "@/server/repositories/audit-log-reposi
 import { createSupabasePreviewStorage } from "@/lib/media/preview-storage";
 import { sanitizeOriginalFilename } from "@/lib/media/filenames";
 import { completeUpload } from "@/server/use-cases/uploads";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 import { getServerEnv } from "@/lib/env";
 import { AppError, jsonError, jsonOk, newRequestId } from "@/lib/api/response";
 
@@ -39,6 +40,18 @@ export async function POST(request: Request, { params }: RouteParams) {
         "ALBUM_SESSION_INVALID",
         "Sessão de álbum inválida ou expirada.",
         401,
+      );
+    }
+
+    const { allowed } = await checkRateLimit(
+      "upload-complete",
+      `${user.id}:${albumId}`,
+    );
+    if (!allowed) {
+      throw new AppError(
+        "RATE_LIMITED",
+        "Demasiados envios em curso. Tente novamente dentro de instantes.",
+        429,
       );
     }
 

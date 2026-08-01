@@ -310,4 +310,64 @@ Limitações conhecidas (detalhe em `docs/decisions/0007`):
 
 ## Fase 7 — Hardening e deploy
 
-**Estado: por iniciar**
+**Estado: concluída**
+
+- [x] Content Security Policy e cabeçalhos de segurança
+      (`lib/security/csp.ts`, aplicados em `lib/auth/update-session.ts`
+      a todas as respostas): `frame-ancestors 'none'`, `object-src
+      'none'`, `base-uri`/`form-action 'self'`, `img-src`/`connect-src`
+      limitados ao próprio site e ao host do Supabase configurado,
+      `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`,
+      `Permissions-Policy`, `Strict-Transport-Security`. CSP com nonce
+      por pedido foi tentada primeiro e abandonada por não ser fiável
+      em páginas estáticas nesta versão do Next.js (detalhe em
+      `docs/decisions/0008`).
+- [x] CSRF: decidido que `SameSite=Lax` (omissão do `@supabase/ssr`)
+      já protege as mutações baseadas em cookie, sem token dedicado.
+- [x] Rate limiting (`lib/security/rate-limit.ts`, Upstash) em
+      `POST /api/albums/resolve` e nos dois endpoints de upload —
+      desligado sem `UPSTASH_REDIS_REST_*` configurado, tal como já
+      adiado nas ADRs 0003/0005/0007.
+- [x] CI (`.github/workflows/ci.yml`): lint + typecheck + testes
+      unitários + build num job, testes E2E noutro.
+- [x] Testes E2E (`tests/e2e/`): proteção das rotas administrativas,
+      fluxo do convidado com a rede simulada por `page.route()` (nunca
+      mocks dentro da aplicação), verificação automática de
+      acessibilidade com `@axe-core/playwright` — encontrou e corrigiu
+      um problema real de contraste (secção 17).
+- [x] Checklist de produção
+      (`docs/operations/production-checklist.md`): Google
+      Cloud/Supabase, segredos, migrações, build/deploy no Cloud Run,
+      smoke tests pós-deploy, rollback.
+- [x] Validação do `Dockerfile`: parcial, por bloqueio de rede real ao
+      registo Docker neste ambiente (confirmado, não presumido);
+      `.dockerignore`, `pnpm-workspace.yaml` e os binários nativos do
+      `sharp` verificados estaticamente, e o comando final do
+      `Dockerfile` (`node .next/standalone/server.js`) reproduzido e
+      validado manualmente fora do Docker.
+- [x] `pnpm check` (lint + typecheck + 179 testes) e `pnpm build` a
+      passar; 15 testes E2E a passar (`pnpm test:e2e`); 20 testes pgTAP
+      de RLS continuam a passar.
+
+Limitações conhecidas (detalhe em `docs/decisions/0008`):
+
+- CSP usa `'unsafe-inline'` para scripts, não nonces — mitiga menos
+  classes de XSS do que uma CSP com nonce funcional teria.
+- Sem confirmação end-to-end do `docker build` completo.
+- E2E automático só cobre fluxos de convidado sem sessão real; login de
+  administrador, ligação ao Drive, criação de álbum, moderação e tempo
+  real entre dois browsers continuam a exigir verificação manual em
+  staging (checklist de produção).
+- Rate limiting sem efeito real neste ambiente (sem Upstash
+  configurado) — só a plumbing e o estado "desligado" foram testados.
+
+## MVP completo
+
+Todas as fases da secção 22 do `CLAUDE.md` (0 a 7) estão concluídas.
+O critério de saída de cada fase está documentado na respetiva secção
+acima, e as decisões de implementação em `docs/decisions/0001` a
+`0008`. As limitações conhecidas de cada fase — sobretudo a
+impossibilidade de testar contra um Supabase/Google Drive reais e um
+`docker build` completo neste ambiente de desenvolvimento — ficam como
+trabalho de verificação manual antes da primeira implantação real,
+guiado por `docs/operations/production-checklist.md`.

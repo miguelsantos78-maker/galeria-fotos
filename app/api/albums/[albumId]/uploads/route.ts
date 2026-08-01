@@ -5,6 +5,7 @@ import { createAlbumSessionsRepository } from "@/server/repositories/album-sessi
 import { createUploadJobsRepository } from "@/server/repositories/upload-jobs-repository";
 import { initiateUpload } from "@/server/use-cases/uploads";
 import { initiateUploadSchema } from "@/lib/validation/upload";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 import { AppError, jsonError, jsonOk, newRequestId } from "@/lib/api/response";
 
 interface RouteParams {
@@ -35,6 +36,18 @@ export async function POST(request: Request, { params }: RouteParams) {
         "ALBUM_SESSION_INVALID",
         "Sessão de álbum inválida ou expirada.",
         401,
+      );
+    }
+
+    const { allowed } = await checkRateLimit(
+      "upload-initiate",
+      `${user.id}:${albumId}`,
+    );
+    if (!allowed) {
+      throw new AppError(
+        "RATE_LIMITED",
+        "Demasiados envios iniciados. Tente novamente dentro de instantes.",
+        429,
       );
     }
 

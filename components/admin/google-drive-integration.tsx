@@ -108,7 +108,7 @@ export function GoogleDriveIntegration({
                   Estado: {STATUS_LABELS[connection.status]}
                 </p>
                 {connection.lastVerifiedAt && (
-                  <p className="text-foreground/50 text-xs">
+                  <p className="text-foreground/70 text-xs">
                     Última verificação:{" "}
                     {new Date(connection.lastVerifiedAt).toLocaleString(
                       "pt-PT",

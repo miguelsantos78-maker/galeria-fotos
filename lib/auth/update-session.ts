@@ -1,23 +1,35 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getPublicEnv } from "@/lib/env";
+import { buildSecurityHeaders } from "@/lib/security/csp";
 
 const ADMIN_PREFIX = "/admin";
 const LOGIN_PATH = "/admin/login";
 
+function applyHeaders(response: NextResponse, headers: Record<string, string>) {
+  for (const [name, value] of Object.entries(headers)) {
+    response.headers.set(name, value);
+  }
+  return response;
+}
+
 /**
  * Renova a sessão Supabase a cada pedido (necessário porque os Server
- * Components não conseguem escrever cookies) e faz uma verificação
- * otimista de acesso às rotas /admin — apenas confirma que existe uma
- * sessão não anónima, sem consultar profiles.role. A verificação real de
+ * Components não conseguem escrever cookies), faz uma verificação
+ * otimista de acesso às rotas /admin, e aplica CSP + cabeçalhos de
+ * segurança a todas as respostas (secção 15). A verificação real de
  * autorização acontece sempre no servidor via requireAdmin()
  * (lib/auth/dal.ts), tal como recomendado pela documentação do Next.js
  * para Proxy/Middleware.
  */
 export async function updateSession(request: NextRequest) {
+  const env = getPublicEnv();
+  const { headers: securityHeaders } = buildSecurityHeaders(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+  );
+
   let response = NextResponse.next({ request });
 
-  const env = getPublicEnv();
   const supabase = createServerClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -50,8 +62,8 @@ export async function updateSession(request: NextRequest) {
   if (isAdminRoute && !isLoginRoute && (!user || user.is_anonymous)) {
     const loginUrl = new URL(LOGIN_PATH, request.url);
     loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+    return applyHeaders(NextResponse.redirect(loginUrl), securityHeaders);
   }
 
-  return response;
+  return applyHeaders(response, securityHeaders);
 }

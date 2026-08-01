@@ -5,6 +5,7 @@ import { createShareLinksRepository } from "@/server/repositories/share-links-re
 import { createAlbumSessionsRepository } from "@/server/repositories/album-sessions-repository";
 import { resolveAlbumSession } from "@/server/use-cases/resolve-album";
 import { resolveAlbumSchema } from "@/lib/validation/share-link";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { AppError, jsonError, jsonOk, newRequestId } from "@/lib/api/response";
 
 /**
@@ -17,6 +18,19 @@ export async function POST(request: Request) {
 
   try {
     const input = resolveAlbumSchema.parse(await request.json());
+
+    const { allowed } = await checkRateLimit(
+      "album-resolve",
+      getClientIp(request),
+    );
+    if (!allowed) {
+      throw new AppError(
+        "RATE_LIMITED",
+        "Demasiadas tentativas. Tente novamente dentro de instantes.",
+        429,
+      );
+    }
+
     const supabase = await createSupabaseServerClient();
 
     let {

@@ -109,7 +109,7 @@ export function PhotoGrid({
   return (
     <div className="flex w-full flex-col gap-4">
       {!isConnected && (
-        <p role="status" className="text-foreground/50 text-center text-xs">
+        <p role="status" className="text-foreground/70 text-center text-xs">
           Ligação em tempo real indisponível — a atualizar periodicamente.
         </p>
       )}

@@ -107,6 +107,12 @@ docker build -t livegallery .
 docker run -p 3000:3000 --env-file .env.local livegallery
 ```
 
+## Deploy em produção
+
+Guia completo (Google Cloud/Supabase, segredos, migrações, smoke tests
+e rollback) em
+[`docs/operations/production-checklist.md`](./docs/operations/production-checklist.md).
+
 ## Estrutura do projeto
 
 ```text

@@ -274,7 +274,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
           </label>
         </div>
         {!consentGiven && (
-          <p className="text-foreground/50 text-xs">
+          <p className="text-foreground/70 text-xs">
             Aceite as condições acima para poder enviar fotografias.
           </p>
         )}
@@ -303,7 +303,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
               </span>
 
               {item.status === "queued" && (
-                <span className="text-foreground/50 text-xs">Na fila…</span>
+                <span className="text-foreground/70 text-xs">Na fila…</span>
               )}
 
               {item.status === "uploading" && (
@@ -325,7 +325,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
               )}
 
               {item.status === "canceled" && (
-                <span className="text-foreground/50 text-xs">Cancelada</span>
+                <span className="text-foreground/70 text-xs">Cancelada</span>
               )}
 
               {item.status === "error" && (
