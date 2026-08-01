@@ -13,6 +13,9 @@ interface RouteParams {
   params: Promise<{ photoId: string }>;
 }
 
+// Sem efeito fora da Vercel (Cloud Run não lê isto).
+export const maxDuration = 60;
+
 /**
  * Transmite o original a partir do Drive (secção 5.4/14) — nunca devolve
  * um URL do Google ou um token ao cliente. Sem cache partilhado: o

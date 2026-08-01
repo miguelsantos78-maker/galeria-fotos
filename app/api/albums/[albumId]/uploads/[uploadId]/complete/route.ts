@@ -17,6 +17,10 @@ interface RouteParams {
   params: Promise<{ albumId: string; uploadId: string }>;
 }
 
+// Envio para o Drive + processamento de imagem pode ultrapassar os 10s
+// por omissão da Vercel; sem efeito fora da Vercel (Cloud Run não lê isto).
+export const maxDuration = 60;
+
 /**
  * Recebe os bytes do ficheiro (multipart/form-data, campo "file") e
  * conclui o envio iniciado por `POST .../uploads` (secção 12/14). Uma
