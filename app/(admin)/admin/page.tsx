@@ -11,12 +11,20 @@ export default async function AdminDashboardPage() {
         Sessão iniciada como{" "}
         <strong>{profile.display_name ?? profile.email}</strong>.
       </p>
-      <Link
-        href="/admin/albums"
-        className="bg-brand-600 hover:bg-brand-700 rounded-full px-5 py-2 text-sm font-medium text-white transition-colors"
-      >
-        Gerir álbuns
-      </Link>
+      <div className="flex flex-wrap justify-center gap-3">
+        <Link
+          href="/admin/albums"
+          className="bg-brand-600 hover:bg-brand-700 rounded-full px-5 py-2 text-sm font-medium text-white transition-colors"
+        >
+          Gerir álbuns
+        </Link>
+        <Link
+          href="/admin/settings/integrations"
+          className="border-border text-foreground hover:bg-surface-muted rounded-full border px-5 py-2 text-sm font-medium transition-colors"
+        >
+          Integração Google Drive
+        </Link>
+      </div>
       <form action="/api/auth/signout" method="post">
         <button
           type="submit"

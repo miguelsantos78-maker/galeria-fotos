@@ -1,6 +1,9 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
+import type { Auth } from "googleapis";
 import type { AlbumsRepository } from "@/server/repositories/albums-repository";
 import type { AuditLogRepository } from "@/server/repositories/audit-log-repository";
+import type { GoogleConnectionsRepository } from "@/server/repositories/google-connections-repository";
 import type {
   CreateAlbumInput,
   UpdateAlbumInput,
@@ -8,6 +11,10 @@ import type {
 import { randomSlugSuffix, slugify } from "@/lib/validation/slug";
 import { AppError } from "@/lib/api/response";
 import type { Database } from "@/lib/db/database.types";
+import { decryptSecret } from "@/lib/security/encryption";
+import { createAuthenticatedClient } from "@/lib/google-drive/oauth-client";
+import { createDriveStorageProvider } from "@/lib/google-drive/drive-provider";
+import type { DriveStorageProvider } from "@/lib/google-drive/types";
 
 type AlbumRow = Database["public"]["Tables"]["albums"]["Row"];
 
@@ -20,6 +27,7 @@ interface AlbumsDeps {
 }
 
 export interface CreateAlbumParams extends CreateAlbumInput {
+  id?: string;
   googleConnectionId: string;
   driveFolderId: string;
 }
@@ -36,6 +44,7 @@ export async function createAlbum(
 
     try {
       const album = await deps.albums.insert({
+        id: input.id,
         owner_id: ctx.ownerId,
         google_connection_id: input.googleConnectionId,
         drive_folder_id: input.driveFolderId,
@@ -70,6 +79,63 @@ export async function createAlbum(
     "ALBUM_SLUG_CONFLICT",
     "Não foi possível gerar um identificador único para o álbum. Tente novamente.",
     409,
+  );
+}
+
+/**
+ * Cria o álbum e a respetiva subpasta no Drive (secção 5.1/12). O `id`
+ * do álbum é pré-gerado porque `createAlbumFolder` precisa de um
+ * `albumId` para gravar em `appProperties` antes de a linha existir na
+ * base de dados — a pasta é criada primeiro e só depois é que o álbum é
+ * inserido, para nunca ficar um álbum "publicado" sem pasta associada.
+ */
+export async function createAlbumWithDriveFolder(
+  input: CreateAlbumInput,
+  ctx: { ownerId: string },
+  deps: AlbumsDeps & {
+    connections: GoogleConnectionsRepository;
+    driveProviderFactory?: (authClient: Auth.OAuth2Client) => DriveStorageProvider;
+  },
+): Promise<AlbumRow> {
+  const connection = await deps.connections.findActiveByUser(ctx.ownerId);
+  if (!connection) {
+    throw new AppError(
+      "GOOGLE_DRIVE_NOT_CONNECTED",
+      "Ligue o Google Drive antes de criar um álbum.",
+      409,
+    );
+  }
+  if (!connection.root_folder_id) {
+    throw new AppError(
+      "GOOGLE_DRIVE_NOT_READY",
+      "A ligação ao Google Drive ainda não está pronta. Tente novamente em instantes.",
+      409,
+    );
+  }
+
+  const albumId = randomUUID();
+  const refreshToken = decryptSecret(
+    connection.encrypted_refresh_token,
+    connection.token_key_version,
+  );
+  const authClient = createAuthenticatedClient(refreshToken);
+  const provider = (deps.driveProviderFactory ?? createDriveStorageProvider)(authClient);
+
+  const { folderId } = await provider.createAlbumFolder({
+    parentFolderId: connection.root_folder_id,
+    albumId,
+    title: input.title,
+  });
+
+  return createAlbum(
+    {
+      ...input,
+      id: albumId,
+      googleConnectionId: connection.id,
+      driveFolderId: folderId,
+    },
+    ctx,
+    deps,
   );
 }
 

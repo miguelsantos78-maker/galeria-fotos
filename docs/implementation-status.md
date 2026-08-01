@@ -120,7 +120,51 @@ Limitações conhecidas (detalhe em `docs/decisions/0003`):
 
 ## Fase 3 — Google Drive
 
-**Estado: por iniciar**
+**Estado: concluída**
+
+- [x] OAuth 2.0 Authorization Code Flow com PKCE (S256), `state`
+      anti-CSRF e cookies `HttpOnly`/`Secure`/`SameSite=Lax` de curta
+      duração, separado do login administrativo
+      (`lib/google-drive/oauth-client.ts`,
+      `app/api/google-drive/{connect,callback}/route.ts`).
+- [x] Refresh token encriptado com AES-256-GCM, versão de chave
+      registada (`lib/security/encryption.ts`,
+      `google_connections.token_key_version`), nunca devolvido ao
+      browser (`lib/google-drive/public-connection.ts`).
+- [x] Adaptador real sobre a Drive API v3
+      (`lib/google-drive/drive-provider.ts`): pasta raiz idempotente
+      (procura por `appProperties` antes de criar), subpasta por álbum,
+      upload/leitura/eliminação idempotente de ficheiros, verificação de
+      ligação — com retry desligado explicitamente nas operações não
+      idempotentes (`{ retry: false }`).
+- [x] Orquestração de ligação/reconexão/desconexão/verificação
+      (`server/use-cases/google-drive-connection.ts`) e criação de
+      álbum com pasta Drive associada
+      (`server/use-cases/albums.ts#createAlbumWithDriveFolder`) — `POST
+      /api/albums` já não recusa com 501, chama o Drive antes de
+      inserir o álbum.
+- [x] UI de administração `/admin/settings/integrations`: estado da
+      ligação, ligar, reconectar, verificar, desligar.
+- [x] Adaptador falso para testes (`tests/unit/fakes/drive-provider.ts`),
+      seguindo o padrão de injeção de dependências já usado para os
+      repositórios.
+- [x] Problema real de dependências encontrado e corrigido: duas versões
+      de `google-auth-library` na árvore de dependências do próprio
+      `googleapis@173.0.0`, causando erro de tipos; resolvido com
+      `pnpm.overrides` (detalhe em `docs/decisions/0004`).
+- [x] `pnpm check` (lint + typecheck + 92 testes) e `pnpm build` a
+      passar.
+
+Limitações conhecidas (detalhe em `docs/decisions/0004`):
+
+- Sem Docker/credenciais OAuth reais neste ambiente — nada foi testado
+  contra o Google Cloud real; a orquestração está coberta com
+  repositório e adaptador Drive falsos.
+- `uploadOriginal`/`getOriginalStream` estão implementados mas ainda sem
+  consumidor — entram em uso na Fase 4.
+- Acesso à documentação oficial do Google bloqueado pela política de
+  rede desta sessão; a superfície da API foi confirmada pelos `.d.ts`
+  dos pacotes instalados.
 
 ## Fase 4 — Upload e processamento
 

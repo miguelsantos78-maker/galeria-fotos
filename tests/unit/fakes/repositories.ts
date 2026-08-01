@@ -159,13 +159,48 @@ export function createFakeAlbumSessionsRepository(
 
 export function createFakeGoogleConnectionsRepository(
   seed: GoogleConnectionRow[] = [],
-): GoogleConnectionsRepository {
+): GoogleConnectionsRepository & { rows: GoogleConnectionRow[] } {
+  const rows = [...seed];
+
   return {
+    rows,
     async findActiveByUser(userId) {
       return (
-        seed.find((row) => row.user_id === userId && row.status === "active") ??
+        rows.find((row) => row.user_id === userId && row.status === "active") ??
         null
       );
+    },
+    async findLatestByUser(userId) {
+      const matches = rows
+        .filter((row) => row.user_id === userId)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return matches[0] ?? null;
+    },
+    async findById(id) {
+      return rows.find((row) => row.id === id) ?? null;
+    },
+    async insert(input) {
+      const row: GoogleConnectionRow = {
+        id: input.id ?? nextId("connection"),
+        user_id: input.user_id,
+        google_account_email: input.google_account_email,
+        encrypted_refresh_token: input.encrypted_refresh_token,
+        token_key_version: input.token_key_version ?? 1,
+        scope: input.scope ?? [],
+        root_folder_id: input.root_folder_id ?? null,
+        status: input.status ?? "active",
+        last_verified_at: input.last_verified_at ?? null,
+        created_at: input.created_at ?? new Date().toISOString(),
+        updated_at: input.updated_at ?? new Date().toISOString(),
+      };
+      rows.push(row);
+      return row;
+    },
+    async update(id, patch) {
+      const row = rows.find((r) => r.id === id);
+      if (!row) return null;
+      Object.assign(row, patch);
+      return row;
     },
   };
 }
@@ -179,6 +214,26 @@ export function createFakeAuditLogRepository(): AuditLogRepository & {
     async record(entry) {
       entries.push(entry);
     },
+  };
+}
+
+export function makeGoogleConnectionRow(
+  overrides: Partial<GoogleConnectionRow> = {},
+): GoogleConnectionRow {
+  const now = new Date().toISOString();
+  return {
+    id: nextId("connection"),
+    user_id: "owner-1",
+    google_account_email: "owner@example.com",
+    encrypted_refresh_token: "iv:tag:ciphertext",
+    token_key_version: 1,
+    scope: ["https://www.googleapis.com/auth/drive.file"],
+    root_folder_id: "root-folder-1",
+    status: "active",
+    last_verified_at: now,
+    created_at: now,
+    updated_at: now,
+    ...overrides,
   };
 }
 
