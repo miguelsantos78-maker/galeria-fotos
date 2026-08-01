@@ -68,9 +68,9 @@ para a ligação ao Google Drive (ver
 [`docs/decisions/0002-fase-1-supabase-auth.md`](./docs/decisions/0002-fase-1-supabase-auth.md)).
 
 Num projeto Supabase hospedado, active o fornecedor Google e o
-"Anonymous sign-ins" em Authentication → Providers no dashboard, e
-aplique as migrações com `supabase link` + `supabase db push` (ou
-`supabase db push --linked`).
+"Allow anonymous sign-ins" em Authentication → Sign In / Providers no
+dashboard, e aplique as migrações com `supabase link` + `supabase db
+push` (ou `supabase db push --linked`).
 
 ### Primeiro administrador
 

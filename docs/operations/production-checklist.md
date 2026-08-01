@@ -36,10 +36,13 @@ por ordem na primeira implantação; nas seguintes, salta diretamente para
    0005 nesta fase) foram aplicadas — em particular a 0005, que liga
    `photos` à publicação `supabase_realtime`; sem ela, o tempo real
    (secção 11) fica silenciosamente inativo.
-3. Ativar o fornecedor **Google** em Authentication → Providers, para o
-   login administrativo (secção 6.1) — distinto do OAuth do Drive.
-4. Ativar **Anonymous sign-ins** em Authentication → Settings (secção
-   6.3) — necessário para os convidados.
+3. Ativar o fornecedor **Google** em Authentication → Sign In / Providers,
+   para o login administrativo (secção 6.1) — distinto do OAuth do Drive.
+4. Na mesma página (Authentication → Sign In / Providers), ativar
+   **Allow anonymous sign-ins** (secção 6.3) — necessário para os
+   convidados. Não é um fornecedor OAuth com Client ID/Secret; é um
+   interruptor simples, normalmente junto ao topo da página, antes ou
+   separado da lista de fornecedores de terceiros (Google, GitHub, etc.).
 5. Confirmar que o bucket `photo-previews` existe e continua privado
    (`public: false`) — criado pela migração 0004.
 6. Copiar `Project URL`, `anon public key` e `service_role key` — vão
