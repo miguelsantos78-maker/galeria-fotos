@@ -9,6 +9,7 @@ import type { PhotosRepository } from "@/server/repositories/photos-repository";
 import type { AuditLogRepository } from "@/server/repositories/audit-log-repository";
 import type { InitiateUploadInput } from "@/lib/validation/upload";
 import { AppError } from "@/lib/api/response";
+import { logger } from "@/lib/observability/logger";
 import { getServerEnv } from "@/lib/env";
 import { decryptSecret } from "@/lib/security/encryption";
 import { createAuthenticatedClient } from "@/lib/google-drive/oauth-client";
@@ -36,6 +37,18 @@ export interface UploadsDeps {
   previewStorage: PreviewStorage;
   /** Injetável para testes ("adaptador mock" — secção 19/22). */
   driveProviderFactory?: (authClient: Auth.OAuth2Client) => DriveStorageProvider;
+}
+
+/**
+ * Extrai só o código de erro da API do Google (nunca o corpo completo,
+ * que pode incluir cabeçalhos com informação sensível) — o suficiente
+ * para diagnosticar falhas de envio ao Drive nos logs (secção 18) sem
+ * arriscar registar tokens ou dados pessoais.
+ */
+function extractGoogleApiErrorCode(error: unknown): string | number | null {
+  if (typeof error !== "object" || error === null) return null;
+  const withCode = error as { code?: string | number; status?: string | number };
+  return withCode.code ?? withCode.status ?? null;
 }
 
 /**
@@ -225,7 +238,13 @@ export async function completeUpload(
         liveGalleryAlbumId: ctx.albumId,
       },
     });
-  } catch {
+  } catch (error) {
+    logger.error({
+      operation: "uploads.completeUpload.driveUpload",
+      albumId: ctx.albumId,
+      message: error instanceof Error ? error.message : String(error),
+      driveErrorCode: extractGoogleApiErrorCode(error),
+    });
     await deps.uploadJobs.update(job.id, { status: "failed" });
     throw new AppError(
       "UPLOAD_DRIVE_FAILED",
