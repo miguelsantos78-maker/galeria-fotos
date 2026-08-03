@@ -46,6 +46,8 @@ function setup(
       album_id: album.id,
       token_hash: tokenHash,
       pin_hash: null,
+      encrypted_token: null,
+      token_key_version: null,
       permissions: ["view"],
       expires_at: null,
       revoked_at: null,

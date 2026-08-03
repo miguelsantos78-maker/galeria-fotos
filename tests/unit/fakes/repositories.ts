@@ -104,6 +104,8 @@ export function createFakeShareLinksRepository(
         album_id: input.album_id,
         token_hash: input.token_hash,
         pin_hash: input.pin_hash ?? null,
+        encrypted_token: input.encrypted_token ?? null,
+        token_key_version: input.token_key_version ?? null,
         permissions: input.permissions ?? ["view"],
         expires_at: input.expires_at ?? null,
         revoked_at: input.revoked_at ?? null,

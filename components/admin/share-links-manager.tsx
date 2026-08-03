@@ -37,6 +37,7 @@ type CreateShareLinkFormValues = z.input<typeof shareLinkFormSchema>;
 export function ShareLinksManager({ albumId }: { albumId: string }) {
   const queryClient = useQueryClient();
   const [createdToken, setCreatedToken] = useState<string | null>(null);
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
 
   const linksQuery = useQuery({
     queryKey: ["albums", albumId, "share-links"],
@@ -85,25 +86,23 @@ export function ShareLinksManager({ albumId }: { albumId: string }) {
     },
   });
 
-  const guestUrl = createdToken
-    ? `${window.location.origin}/a/${createdToken}`
-    : null;
+  const buildGuestUrl = (token: string) => `${window.location.origin}/a/${token}`;
 
   return (
     <section className="rounded-card border-border bg-surface flex flex-col gap-4 border p-6">
       <h2 className="text-foreground text-lg font-medium">Links de partilha</h2>
 
-      {guestUrl && (
+      {createdToken && (
         <div className="rounded-card border-success/30 bg-success/10 flex flex-col gap-2 border p-4 text-sm">
-          <p className="text-foreground font-medium">
-            Link criado — copie agora, não voltará a ser mostrado.
-          </p>
+          <p className="text-foreground font-medium">Link criado.</p>
           <code className="bg-surface-muted text-foreground rounded px-2 py-1 break-all">
-            {guestUrl}
+            {buildGuestUrl(createdToken)}
           </code>
           <button
             type="button"
-            onClick={() => navigator.clipboard.writeText(guestUrl)}
+            onClick={() =>
+              navigator.clipboard.writeText(buildGuestUrl(createdToken))
+            }
             className="border-border text-foreground hover:bg-surface-muted self-start rounded-full border px-4 py-1.5 text-sm font-medium"
           >
             Copiar link
@@ -188,42 +187,75 @@ export function ShareLinksManager({ albumId }: { albumId: string }) {
           const isExpired = Boolean(
             link.expires_at && new Date(link.expires_at) <= new Date(),
           );
+          const isActive = !isRevoked && !isExpired;
+          const guestUrl = link.token ? buildGuestUrl(link.token) : null;
 
           return (
             <li
               key={link.id}
-              className="rounded-card border-border flex items-center justify-between border px-4 py-3"
+              className="rounded-card border-border flex flex-col gap-2 border px-4 py-3"
             >
-              <div className="text-sm">
-                <p className="text-foreground">
-                  {link.permissions.map((p) => PERMISSION_LABELS[p]).join(", ")}
-                  {link.hasPin && " · com PIN"}
-                </p>
-                <p className="text-foreground/60">
-                  {isRevoked
-                    ? "Revogado"
-                    : isExpired
-                      ? "Expirado"
-                      : link.expires_at
-                        ? `Expira em ${new Date(link.expires_at).toLocaleString("pt-PT")}`
-                        : "Sem expiração"}
-                </p>
-              </div>
-              {!isRevoked && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        "Revogar este link? Deixa de dar acesso imediatamente.",
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm">
+                  <p className="text-foreground">
+                    {link.permissions
+                      .map((p) => PERMISSION_LABELS[p])
+                      .join(", ")}
+                    {link.hasPin && " · com PIN"}
+                  </p>
+                  <p className="text-foreground/60">
+                    {isRevoked
+                      ? "Revogado"
+                      : isExpired
+                        ? "Expirado"
+                        : link.expires_at
+                          ? `Expira em ${new Date(link.expires_at).toLocaleString("pt-PT")}`
+                          : "Sem expiração"}
+                  </p>
+                </div>
+                {!isRevoked && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          "Revogar este link? Deixa de dar acesso imediatamente.",
+                        )
                       )
-                    )
-                      revokeMutation.mutate(link.id);
-                  }}
-                  className="border-border text-foreground hover:bg-surface-muted rounded-full border px-4 py-1.5 text-sm font-medium"
-                >
-                  Revogar
-                </button>
+                        revokeMutation.mutate(link.id);
+                    }}
+                    className="border-border text-foreground hover:bg-surface-muted shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium"
+                  >
+                    Revogar
+                  </button>
+                )}
+              </div>
+
+              {isActive && guestUrl && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="bg-surface-muted text-foreground/80 rounded px-2 py-1 text-xs break-all">
+                    {guestUrl}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(guestUrl);
+                      setCopiedLinkId(link.id);
+                      setTimeout(() => setCopiedLinkId(null), 2000);
+                    }}
+                    className="border-border text-foreground hover:bg-surface-muted shrink-0 rounded-full border px-3 py-1 text-xs font-medium"
+                  >
+                    {copiedLinkId === link.id ? "Copiado!" : "Copiar"}
+                  </button>
+                </div>
+              )}
+
+              {isActive && !guestUrl && (
+                <p className="text-foreground/60 text-xs">
+                  Este link foi criado antes de os links ficarem
+                  recuperáveis — revogue e crie um novo para poder
+                  copiá-lo mais tarde.
+                </p>
               )}
             </li>
           );

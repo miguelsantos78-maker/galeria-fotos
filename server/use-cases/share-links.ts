@@ -6,14 +6,25 @@ import type { AuditLogRepository } from "@/server/repositories/audit-log-reposit
 import type { CreateShareLinkInput } from "@/lib/validation/share-link";
 import { generateShareToken, hashShareToken } from "@/lib/security/tokens";
 import { hashPin } from "@/lib/security/pin";
+import { encryptSecret, decryptSecret } from "@/lib/security/encryption";
 import { AppError } from "@/lib/api/response";
 import { getServerEnv } from "@/lib/env";
 import { getAlbumForOwner } from "@/server/use-cases/albums";
 import type { Database } from "@/lib/db/database.types";
 
 type ShareLinkRow = Database["public"]["Tables"]["album_share_links"]["Row"];
-export type PublicShareLink = Omit<ShareLinkRow, "token_hash" | "pin_hash"> & {
+export type PublicShareLink = Omit<
+  ShareLinkRow,
+  "token_hash" | "pin_hash" | "encrypted_token" | "token_key_version"
+> & {
   hasPin: boolean;
+  /**
+   * Recuperado a partir de "encrypted_token" (secção
+   * docs/decisions/0013-link-partilha-recuperavel.md) — permite ao
+   * administrador voltar a copiar o link sem o regenerar. Só `null`
+   * para links criados antes desta funcionalidade existir.
+   */
+  token: string | null;
 };
 
 /** Nunca devolver token_hash/pin_hash ao cliente, mesmo ao dono do álbum. */
@@ -27,6 +38,10 @@ export function toPublicShareLink(link: ShareLinkRow): PublicShareLink {
     created_by: link.created_by,
     created_at: link.created_at,
     hasPin: link.pin_hash !== null,
+    token:
+      link.encrypted_token && link.token_key_version !== null
+        ? decryptSecret(link.encrypted_token, link.token_key_version)
+        : null,
   };
 }
 
@@ -37,9 +52,12 @@ interface ShareLinksDeps {
 }
 
 /**
- * Cria um link de partilha. Devolve o token em texto simples (só existe
- * neste momento — nunca é possível voltar a obtê-lo depois, só o hash
- * fica guardado).
+ * Cria um link de partilha. Devolve o token em texto simples desde já,
+ * e o mesmo texto fica também recuperável mais tarde por
+ * `toPublicShareLink` — encriptado (nunca em texto simples) na base de
+ * dados, tal como o refresh token do Google Drive. A verificação de
+ * links de convidado continua a usar só o hash (`token_hash`),
+ * inalterada.
  */
 export async function createShareLink(
   albumId: string,
@@ -51,11 +69,14 @@ export async function createShareLink(
 
   const token = generateShareToken();
   const tokenHash = hashShareToken(token, getServerEnv().APP_TOKEN_PEPPER);
+  const { ciphertext, keyVersion } = encryptSecret(token);
 
   const link = await deps.shareLinks.insert({
     album_id: albumId,
     token_hash: tokenHash,
     pin_hash: input.pin ? hashPin(input.pin) : null,
+    encrypted_token: ciphertext,
+    token_key_version: keyVersion,
     permissions: input.permissions,
     expires_at: input.expiresAt ?? null,
     created_by: ownerId,

@@ -69,7 +69,7 @@ implantação, para não se repetirem:
    supabase db push
    ```
    Confirmar que todas as migrações em `supabase/migrations/` (0001 a
-   0005 nesta fase) foram aplicadas — em particular a 0005, que liga
+   0006 nesta fase) foram aplicadas — em particular a 0005, que liga
    `photos` à publicação `supabase_realtime`; sem ela, o tempo real
    (secção 11) fica silenciosamente inativo.
 3. Ativar o fornecedor **Google** em Authentication → Sign In / Providers,

@@ -4,6 +4,7 @@ import {
   createShareLink,
   listShareLinksForAlbum,
   revokeShareLink,
+  toPublicShareLink,
 } from "@/server/use-cases/share-links";
 import {
   createFakeAlbumSessionsRepository,
@@ -44,6 +45,42 @@ describe("createShareLink", () => {
     expect(link.id).toBeDefined();
     expect(shareLinks.rows[0].token_hash).not.toBe(token);
     expect(auditLog.entries[0].action).toBe("share_link.created");
+  });
+
+  it("guarda o token encriptado, recuperável mais tarde para o dono do álbum", async () => {
+    const album = makeAlbumRow({ owner_id: "owner-1" });
+    const albums = createFakeAlbumsRepository([album]);
+    const shareLinks = createFakeShareLinksRepository();
+    const auditLog = createFakeAuditLogRepository();
+
+    const { link, token } = await createShareLink(
+      album.id,
+      "owner-1",
+      { permissions: ["view"] },
+      { albums, shareLinks, auditLog },
+    );
+
+    expect(shareLinks.rows[0].encrypted_token).not.toBeNull();
+    expect(shareLinks.rows[0].encrypted_token).not.toBe(token);
+    expect(toPublicShareLink(link).token).toBe(token);
+  });
+
+  it("toPublicShareLink devolve token null para links sem encrypted_token (criados antes desta funcionalidade)", () => {
+    const link = {
+      id: "link-1",
+      album_id: "album-1",
+      token_hash: "hash",
+      pin_hash: null,
+      encrypted_token: null,
+      token_key_version: null,
+      permissions: ["view"] satisfies ("view" | "upload" | "moderate")[],
+      expires_at: null,
+      revoked_at: null,
+      created_by: "owner-1",
+      created_at: new Date().toISOString(),
+    };
+
+    expect(toPublicShareLink(link).token).toBeNull();
   });
 
   it("guarda o PIN só como hash", async () => {

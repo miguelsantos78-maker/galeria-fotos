@@ -71,6 +71,8 @@ interface AlbumShareLinkRow {
   album_id: string;
   token_hash: string;
   pin_hash: string | null;
+  encrypted_token: string | null;
+  token_key_version: number | null;
   permissions: AlbumSessionPermission[];
   expires_at: string | null;
   revoked_at: string | null;
@@ -233,6 +235,8 @@ export interface Database {
           AlbumShareLinkRow,
           | "id"
           | "pin_hash"
+          | "encrypted_token"
+          | "token_key_version"
           | "permissions"
           | "expires_at"
           | "revoked_at"
@@ -243,6 +247,8 @@ export interface Database {
               AlbumShareLinkRow,
               | "id"
               | "pin_hash"
+              | "encrypted_token"
+              | "token_key_version"
               | "permissions"
               | "expires_at"
               | "revoked_at"
