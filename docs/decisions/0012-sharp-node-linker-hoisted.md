@@ -64,10 +64,26 @@ fatores suspeitos da tentativa anterior:
 `pnpm check` (lint + typecheck + testes unitários) e a suite E2E
 completa (15 testes) confirmados a passar. `VERCEL=1 pnpm build`
 local confirma o ficheiro certo incluído só na rota certa.
-**Não foi possível confirmar o comportamento real em runtime na
-Vercel nesta sessão** — só a build local. Depois deste deploy, é
-essencial testar mesmo o envio de uma fotografia em produção antes de
-considerar isto resolvido.
+
+### Correção de seguimento: faltava a rota de iniciar o envio
+
+Testado em produção real: o deployment funcionou (não repetiu a falha
+de "Deploying outputs..."), mas o envio continuou a falhar — desta vez
+com o erro a acontecer em `POST /api/albums/[albumId]/uploads` (a
+rota que **inicia** o envio), não só na de concluir. Causa:
+`server/use-cases/uploads.ts` tem `initiateUpload` e `completeUpload`
+no mesmo ficheiro, com `import { processImage } from
+"@/lib/media/process-image"` (que importa "sharp") no topo — carregar
+o módulo para `initiateUpload` carrega também esse import, mesmo sem
+nunca chamar `processImage()`. A chave de
+`outputFileTracingIncludes` mudou de `/api/albums/*/uploads/*/complete`
+para `/api/albums/*/uploads` (sem o `/*/complete` final) — como o
+Next.js usa `picomatch` com `contains: true`, esta chave mais curta
+corresponde às duas rotas (a rota de conclusão contém a de iniciar
+como substring do seu caminho). Confirmado por inspeção dos dois
+`.nft.json`: ambas as rotas passaram a incluir o ficheiro, as
+restantes (`/api/health`, `/api/albums/[albumId]/photos`) continuam
+sem ele.
 
 ## Limitações conhecidas
 

@@ -21,8 +21,17 @@ const nextConfig: NextConfig = {
   // sharp (com o node_modules ainda simbólico) suspeita-se ter
   // quebrado o deployment na Vercel — esta versão é deliberadamente o
   // mínimo possível para reduzir esse risco.
+  //
+  // Chave "/api/albums/*/uploads" (sem "/*/complete" no fim) apanha as
+  // DUAS rotas: tanto ".../uploads" (inicia o envio) como
+  // ".../uploads/[uploadId]/complete" (conclui-o) — porque
+  // server/use-cases/uploads.ts tem as duas funções no mesmo ficheiro,
+  // com "sharp" importado no topo; iniciar um envio nunca chama
+  // processImage(), mas o módulo inteiro (incluindo o import) é
+  // carregado na mesma. Confirmado pelo erro em runtime: sem isto, a
+  // rota de iniciar falhava também, não só a de concluir.
   outputFileTracingIncludes: {
-    "/api/albums/*/uploads/*/complete": [
+    "/api/albums/*/uploads": [
       "./node_modules/sharp/node_modules/@img/sharp-libvips-linux-x64/lib/libvips-cpp.so.*",
     ],
   },
