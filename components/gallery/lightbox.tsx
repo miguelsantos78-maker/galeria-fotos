@@ -11,7 +11,6 @@ import type { PublicPhoto } from "@/server/use-cases/photos";
 
 const AUTO_ADVANCE_INTERVAL_MS = 5000;
 const SWIPE_THRESHOLD_PX = 50;
-const SHARE_FEEDBACK_MS = 2000;
 
 function getFocusableElements(container: HTMLElement): HTMLElement[] {
   return Array.from(
@@ -45,7 +44,6 @@ export function Lightbox({
 }) {
   const [index, setIndex] = useState(initialIndex);
   const [isPresenting, setIsPresenting] = useState(startInPresentationMode);
-  const [copyFeedback, setCopyFeedback] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const touchStartX = useRef<number | null>(null);
@@ -142,21 +140,6 @@ export function Lightbox({
     else goNext();
   }
 
-  async function handleShare() {
-    if (!photo) return;
-    const url = new URL(window.location.href);
-    url.searchParams.set("photo", photo.id);
-    try {
-      await navigator.clipboard.writeText(url.toString());
-      setCopyFeedback(true);
-      setTimeout(() => setCopyFeedback(false), SHARE_FEEDBACK_MS);
-    } catch {
-      // Sem acesso à área de transferência (ex.: permissão negada) — sem
-      // alternativa segura aqui, o utilizador pode copiar o URL da barra
-      // de endereço manualmente.
-    }
-  }
-
   if (!photo) return null;
 
   const hasPrev = index > 0;
@@ -245,14 +228,6 @@ export function Lightbox({
             Transferir
           </a>
         )}
-
-        <button
-          type="button"
-          onClick={handleShare}
-          className="rounded-full border border-white/30 px-4 py-1.5 font-medium text-white transition-colors hover:bg-white/10"
-        >
-          {copyFeedback ? "Link copiado" : "Partilhar"}
-        </button>
       </div>
     </div>
   );
