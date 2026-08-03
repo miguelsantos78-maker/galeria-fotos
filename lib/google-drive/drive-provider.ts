@@ -1,4 +1,5 @@
 import "server-only";
+import { Readable } from "node:stream";
 import { google, type Auth } from "googleapis";
 import type {
   ConnectionHealth,
@@ -85,6 +86,14 @@ export function createDriveStorageProvider(
       body,
       appProperties,
     }: UploadOriginalInput): Promise<DriveFileResult> {
+      // A googleapis (via gaxios) espera um stream em "media.body" — só
+      // reconhece o formato certo do pedido multipart através de
+      // `.pipe()`; um Buffer diretamente falha em runtime com
+      // "body.pipe is not a function", sem isto ser óbvio pelo tipo
+      // aceite (`NodeJS.ReadableStream | Buffer`, secção 12 do
+      // CLAUDE.md) nem pelos tipos do próprio pacote.
+      const mediaBody = Buffer.isBuffer(body) ? Readable.from(body) : body;
+
       const created = await drive.files.create(
         {
           requestBody: {
@@ -92,7 +101,7 @@ export function createDriveStorageProvider(
             parents: [parentFolderId],
             appProperties,
           },
-          media: { mimeType, body },
+          media: { mimeType, body: mediaBody },
           fields: "id, name, mimeType, size",
         },
         { retry: false },
