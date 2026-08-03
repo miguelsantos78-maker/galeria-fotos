@@ -6,6 +6,42 @@ aprovados. Este documento é o guia operacional para chegar lá — segue-o
 por ordem na primeira implantação; nas seguintes, salta diretamente para
 "Antes de cada deploy".
 
+## 0. Notas específicas de um deploy na Vercel
+
+Ver `docs/decisions/0009-deploy-vercel.md` para a decisão de usar a
+Vercel em vez de Cloud Run. Armadilhas reais encontradas na primeira
+implantação, para não se repetirem:
+
+- **Framework Preset**: no import do projeto, a Vercel pode detetar
+  "Other" em vez de "Next.js" (aconteceu com a presença de
+  `pnpm-workspace.yaml` na raiz). Sem o preset correto, a build "passa"
+  mas todas as rotas dão 404. Corrigir em Project Settings → Build and
+  Deployment → Framework Preset → "Next.js", e fazer redeploy.
+- **`NEXT_PUBLIC_SUPABASE_URL`**: usar só o "Project URL" simples
+  (`https://<ref>.supabase.co`), nunca o URL da "Data API"
+  (`.../rest/v1`) que o dashboard novo do Supabase também mostra — um
+  `/rest/v1` a mais aqui faz o pedido de login cair no gateway errado
+  ("No API key found in request").
+- **Supabase → Authentication → URL Configuration**: "Site URL" e
+  "Redirect URLs" têm de apontar para o domínio de produção real
+  (`https://<domínio>/**`), não para `http://localhost:3000` (valor por
+  omissão) — caso contrário o login OAuth termina a sessão de volta em
+  `localhost` em vez do domínio de produção.
+- **Google Cloud → OAuth consent screen em modo "Testing"**: só
+  utilizadores na lista de "Test users" conseguem autorizar (erro
+  `403: access_denied` para todos os outros, incluindo o próprio
+  administrador se não estiver lá). Adicionar o email do administrador
+  em "Test users". Enquanto o ecrã de consentimento estiver em
+  "Testing" (não publicado/verificado pela Google), os refresh tokens
+  emitidos expiram ao fim de 7 dias — a ligação ao Drive vai
+  ocasionalmente pedir reconexão. Aceitável para um único
+  administrador; publicar/verificar a app remove este limite mas é um
+  processo mais longo, só compensa com múltiplos administradores ou
+  uso público.
+- **Variáveis `NEXT_PUBLIC_*`**: qualquer alteração só tem efeito depois
+  de um novo deploy (ficam embutidas no código no momento da build) —
+  um "Redeploy" simples chega, não é preciso alterar código.
+
 ## 1. Antes da primeira implantação
 
 ### Google Cloud
