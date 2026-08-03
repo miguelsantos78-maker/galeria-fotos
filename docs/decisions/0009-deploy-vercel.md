@@ -108,6 +108,56 @@ ficheiros do `libvips`; as restantes ~19 rotas (incluindo outras que
 importam `lib/media` só por tipos, sem usar `sharp` diretamente) não
 incluem nada a mais.
 
+### 6. `outputFileTracingIncludes` revertido — suspeito de quebrar o deployment na Vercel
+
+Apesar da decisão 5 estar confirmada correta localmente (só a rota
+certa recebia o binário do `sharp`), o deployment seguinte na Vercel
+continuou a falhar, sempre no mesmo ponto: a build do Next.js
+terminava sem nenhum erro ("Build Completed in /vercel/output"), mas o
+passo seguinte da própria Vercel ("Deploying outputs...") falhava com
+um erro genérico ("An unexpected error occurred... This may be a
+transient issue"), sem detalhe nenhum nos Build Logs.
+
+Investigação: confirmámos que o Next.js já declara uma dependência
+opcional própria e separada do `sharp` (versão 0.34.5, para as
+otimizações internas de imagem do próprio Next), que coexiste no
+`node_modules/.pnpm` com a versão 0.35.3 usada por
+`lib/media/process-image.ts`. Tentou-se restringir os padrões de
+`outputFileTracingIncludes` para nunca apanhar essa segunda instalação
+(usando `sharp@0.35.*` em vez de `sharp@*`), mas confirmámos por
+inspeção do `.nft.json` gerado que o Next.js **já inclui os ficheiros
+do seu próprio `sharp@0.34.5` por defeito em qualquer rota**,
+independentemente da nossa configuração — não é coisa que a nossa
+config introduzisse ou pudesse evitar.
+
+Não foi possível confirmar a causa exata da falha em "Deploying
+outputs..." sem acesso direto à infraestrutura da Vercel (esta sessão
+de desenvolvimento não consegue reproduzir esse passo específico,
+só a build local do Next.js). O que se sabe com confiança, por
+comparação direta do histórico de deployments:
+
+- O deployment imediatamente anterior a introduzir
+  `outputFileTracingIncludes` (só com `serverExternalPackages`)
+  concluiu build **e** deployment com sucesso (ambiente Preview,
+  build fresca, não uma reutilização de build antiga).
+- Todos os deployments a partir da introdução de
+  `outputFileTracingIncludes` (a versão ampla e depois a versão restrita
+  a uma rota) falharam de forma idêntica, sempre no mesmo ponto.
+
+Decisão, para não continuar a tentar acertar às cegas contra
+infraestrutura que não se consegue testar diretamente: **reverter
+`outputFileTracingIncludes` por completo**, mantendo só
+`serverExternalPackages: ["sharp"]`, para restaurar deployments
+funcionais. Isto significa que o `ERR_DLOPEN_FAILED` original (secção
+"Impede o Next.js de tentar empacotar..." acima) pode voltar a
+acontecer especificamente na rota de conclusão de upload, até se
+encontrar e validar (num ambiente com acesso real à Vercel) uma
+alternativa — por exemplo, `node-linker=hoisted` num `.npmrc` (troca a
+estrutura simbólica do `node_modules` do pnpm por uma mais tradicional,
+frequentemente recomendada para este tipo de problema), ou reportar o
+caso à Vercel/Next.js se se confirmar tratar-se de um problema real da
+plataforma com esta combinação de versões.
+
 ## Limitações conhecidas
 
 - Fotografias originais acima de ~4 MB são rejeitadas na validação do
@@ -119,3 +169,9 @@ incluem nada a mais.
   deploy escolhida, como pede a secção 3 do `CLAUDE.md`.
 - Compressão/redimensionamento no browser antes do envio fica como
   melhoria planeada, não implementada nesta fase.
+- **Conhecida e não resolvida**: o envio de fotografias na Vercel pode
+  voltar a falhar com `ERR_DLOPEN_FAILED` do `sharp` (decisão 6) — a
+  tentativa de corrigir isto com `outputFileTracingIncludes` foi
+  revertida por suspeita de quebrar o deployment por completo, o que é
+  pior do que o envio de fotos falhar. Precisa de validação num
+  ambiente com acesso direto à Vercel antes de se tentar de novo.

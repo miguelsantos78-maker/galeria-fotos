@@ -9,32 +9,17 @@ const nextConfig: NextConfig = {
   // nativo (libvips) não sobrevive ao bundling e falha em runtime com
   // ERR_DLOPEN_FAILED. Recomendação oficial do próprio sharp para
   // Next.js: https://sharp.pixelplumbing.com/install#nextjs
-  serverExternalPackages: ["sharp"],
-  // Só desativar o bundling (acima) não chega: o rastreio automático de
-  // ficheiros da Vercel não segue o dlopen() do binário nativo do
-  // sharp/libvips, por isso o .so fica de fora da função serverless
-  // implantada mesmo estando presente no node_modules da build. Incluir
-  // explicitamente resolve o ERR_DLOPEN_FAILED em runtime.
   //
-  // Aplicado só à ÚNICA rota que importa "sharp" (via
-  // lib/media/process-image.ts, chamado por server/use-cases/uploads.ts)
-  // — aplicar a "/api/**/*" duplicava os ~18 MB do libvips por cada uma
-  // das ~20 rotas de API e fez o deployment falhar ao exceder um limite
-  // de tamanho da Vercel (ver docs/decisions/0009-deploy-vercel.md).
-  outputFileTracingIncludes: {
-    // "*" em vez de "[albumId]"/"[uploadId]" de propósito: o Next usa
-    // picomatch para comparar esta chave com a rota, e colchetes literais
-    // são interpretados como classe de carateres do glob, não como texto —
-    // "[albumId]" nunca correspondia à rota real (bug encontrado ao
-    // confirmar, depois de um deploy falhado, que o ficheiro rastreado
-    // continuava vazio apesar desta configuração).
-    "/api/albums/*/uploads/*/complete": [
-      "./node_modules/sharp/**/*",
-      "./node_modules/@img/**/*",
-      "./node_modules/.pnpm/sharp@*/**/*",
-      "./node_modules/.pnpm/@img+*/**/*",
-    ],
-  },
+  // NOTA: "outputFileTracingIncludes" para forçar os binários do sharp
+  // no deployment foi tentado e revertido — ver
+  // docs/decisions/0009-deploy-vercel.md, decisão 6. Suspeita-se que
+  // essa opção (nesta combinação de versões Next.js 16.2.12/Vercel CLI
+  // 58.1.0) fazia o deployment falhar em "Deploying outputs..." sem
+  // mensagem de erro específica; revertida para restaurar deploys
+  // funcionais. O ERR_DLOPEN_FAILED em runtime pode voltar a acontecer
+  // até se encontrar uma alternativa (nota deixada como limitação
+  // conhecida).
+  serverExternalPackages: ["sharp"],
 };
 
 export default nextConfig;
