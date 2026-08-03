@@ -56,37 +56,54 @@ export function AlbumResolver({ token }: { token: string }) {
 
   return (
     <main className="flex flex-1 flex-col">
-      <header className="safe-top border-border bg-background/90 sticky top-0 z-10 border-b px-4 py-3.5 backdrop-blur">
-        <h1 className="text-foreground font-serif truncate text-xl font-semibold">
+      <header className="safe-top from-brand-600/10 border-border border-b bg-gradient-to-b to-transparent px-6 py-12 text-center">
+        <h1 className="text-foreground font-serif text-3xl font-semibold text-balance sm:text-4xl">
           {album.title}
         </h1>
         {album.description && (
-          <p className="text-foreground/70 mt-1 truncate text-xs">
+          <p className="text-foreground/70 mx-auto mt-3 max-w-md text-sm text-balance">
             {album.description}
           </p>
         )}
       </header>
 
-      <div className="flex flex-1 flex-col pb-24">
+      {canUpload && (
+        <div className="px-4 py-5 sm:px-6">
+          <Link
+            href={`/a/${token}/upload`}
+            aria-label="Adicionar fotografias"
+            className="rounded-card border-brand-600/25 bg-brand-600/5 hover:bg-brand-600/10 flex flex-col items-center gap-4 border px-6 py-8 text-center transition-colors sm:flex-row sm:justify-between sm:text-left"
+          >
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:text-left">
+              <span className="bg-brand-600 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-5 w-5"
+                >
+                  <path d="M10 4a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2h-4v4a1 1 0 1 1-2 0v-4H5a1 1 0 1 1 0-2h4V5a1 1 0 0 1 1-1Z" />
+                </svg>
+              </span>
+              <div>
+                <p className="text-foreground font-serif text-lg font-semibold">
+                  Adicionar fotografias
+                </p>
+                <p className="text-foreground/70 text-sm">
+                  Partilhe as suas fotos deste dia com todos os convidados.
+                </p>
+              </div>
+            </div>
+            <span className="bg-brand-600 shrink-0 rounded-full px-5 py-2.5 text-sm font-medium text-white">
+              Enviar agora
+            </span>
+          </Link>
+        </div>
+      )}
+
+      <div className="flex flex-1 flex-col">
         <PhotoGrid albumId={album.id} downloadEnabled={album.downloadEnabled} />
       </div>
-
-      {canUpload && (
-        <Link
-          href={`/a/${token}/upload`}
-          className="fab-bottom bg-brand-600 hover:bg-brand-700 active:bg-brand-700 fixed right-5 z-20 inline-flex items-center gap-2 rounded-full px-5 py-3.5 text-sm font-medium text-white shadow-lg transition-colors"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className="h-4 w-4"
-          >
-            <path d="M10 4a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2h-4v4a1 1 0 1 1-2 0v-4H5a1 1 0 1 1 0-2h4V5a1 1 0 0 1 1-1Z" />
-          </svg>
-          Adicionar fotografias
-        </Link>
-      )}
     </main>
   );
 }

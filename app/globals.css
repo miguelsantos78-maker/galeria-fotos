@@ -80,12 +80,6 @@ body {
 .safe-bottom {
   padding-bottom: max(env(safe-area-inset-bottom), 0px);
 }
-/* Distância ao fundo do ecrã para elementos fixos (position: fixed),
-   onde padding não tem efeito — soma a barra de gestos do sistema à
-   margem visual pretendida. */
-.fab-bottom {
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 1.25rem);
-}
 
 @media (prefers-reduced-motion: reduce) {
   *,
