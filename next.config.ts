@@ -9,17 +9,23 @@ const nextConfig: NextConfig = {
   // nativo (libvips) não sobrevive ao bundling e falha em runtime com
   // ERR_DLOPEN_FAILED. Recomendação oficial do próprio sharp para
   // Next.js: https://sharp.pixelplumbing.com/install#nextjs
-  //
-  // NOTA: "outputFileTracingIncludes" para forçar os binários do sharp
-  // no deployment foi tentado e revertido — ver
-  // docs/decisions/0009-deploy-vercel.md, decisão 6. Suspeita-se que
-  // essa opção (nesta combinação de versões Next.js 16.2.12/Vercel CLI
-  // 58.1.0) fazia o deployment falhar em "Deploying outputs..." sem
-  // mensagem de erro específica; revertida para restaurar deploys
-  // funcionais. O ERR_DLOPEN_FAILED em runtime pode voltar a acontecer
-  // até se encontrar uma alternativa (nota deixada como limitação
-  // conhecida).
   serverExternalPackages: ["sharp"],
+  // ".npmrc" com "node-linker=hoisted" (ver
+  // docs/decisions/0012-sharp-node-linker-hoisted.md) mudou o
+  // node_modules do pnpm de simbólico para uma estrutura achatada
+  // tipo npm clássico — com isso, o rastreio automático da Vercel já
+  // inclui sozinho quase tudo o que o sharp precisa (o binário nativo
+  // .node, os wrappers JS), exceto este único ficheiro (confirmado por
+  // inspeção do .nft.json gerado localmente: era o único a faltar).
+  // Uma tentativa anterior de incluir a árvore toda de ficheiros do
+  // sharp (com o node_modules ainda simbólico) suspeita-se ter
+  // quebrado o deployment na Vercel — esta versão é deliberadamente o
+  // mínimo possível para reduzir esse risco.
+  outputFileTracingIncludes: {
+    "/api/albums/*/uploads/*/complete": [
+      "./node_modules/sharp/node_modules/@img/sharp-libvips-linux-x64/lib/libvips-cpp.so.*",
+    ],
+  },
 };
 
 export default nextConfig;
