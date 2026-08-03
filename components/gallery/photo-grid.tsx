@@ -107,44 +107,50 @@ export function PhotoGrid({
   }
 
   return (
-    <div className="flex w-full flex-col gap-4">
+    <div className="flex w-full flex-1 flex-col">
       {!isConnected && (
-        <p role="status" className="text-foreground/70 text-center text-xs">
+        <p role="status" className="text-foreground/70 px-4 py-2 text-center text-xs">
           Ligação em tempo real indisponível — a atualizar periodicamente.
         </p>
       )}
 
       {photos.length === 0 ? (
-        <div className="rounded-card border-border flex flex-1 flex-col items-center justify-center gap-2 border border-dashed px-8 py-16">
-          <p className="text-foreground/70">
+        <div className="rounded-card border-border mx-4 my-6 flex flex-1 flex-col items-center justify-center gap-2 border border-dashed px-8 py-16">
+          <p className="text-foreground/70 text-center">
             Ainda não há fotografias neste álbum.
           </p>
         </div>
       ) : (
         <>
-          <div className="flex justify-end">
+          <div className="flex justify-end px-3 py-2">
             <button
               type="button"
               onClick={openPresentation}
-              className="border-border text-foreground hover:bg-surface-muted rounded-full border px-4 py-1.5 text-sm font-medium transition-colors"
+              aria-label="Iniciar apresentação"
+              className="border-border text-foreground hover:bg-surface-muted inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors"
             >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="h-3.5 w-3.5"
+              >
+                <path d="M6 4.5v11l9-5.5-9-5.5Z" />
+              </svg>
               Apresentação
             </button>
           </div>
 
-          <div className="columns-2 gap-2 sm:columns-3 md:columns-4">
+          {/* Grelha densa e sem espaçamento visual entre miniaturas — o
+              padrão de um álbum partilhado (secção 1/10.1): tudo
+              quadrado, tudo até à borda do ecrã em telemóvel. */}
+          <div className="grid grid-cols-3 gap-0.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
             {photos.map((photo) => (
               <button
                 key={photo.id}
                 type="button"
                 onClick={() => updatePhotoParam(photo.id)}
-                className="bg-surface-muted mb-2 block w-full overflow-hidden rounded-md break-inside-avoid"
-                style={{
-                  aspectRatio:
-                    photo.width && photo.height
-                      ? `${photo.width} / ${photo.height}`
-                      : "1 / 1",
-                }}
+                className="bg-surface-muted focus-visible:ring-brand-600 relative block aspect-square w-full overflow-hidden focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset"
               >
                 {photo.thumbnailUrl && (
                   // eslint-disable-next-line @next/next/no-img-element -- URL assinado de um domínio de Storage dinâmico (por instalação); ver docs/decisions/0005.
@@ -152,7 +158,7 @@ export function PhotoGrid({
                     src={photo.thumbnailUrl}
                     alt="Fotografia do álbum"
                     loading="lazy"
-                    className="h-full w-full object-cover"
+                    className="absolute inset-0 h-full w-full object-cover"
                   />
                 )}
               </button>
@@ -166,7 +172,7 @@ export function PhotoGrid({
               type="button"
               onClick={() => fetchNextPage()}
               disabled={isFetchingNextPage}
-              className="border-border text-foreground hover:bg-surface-muted mx-auto rounded-full border px-5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              className="border-border text-foreground hover:bg-surface-muted mx-auto my-6 rounded-full border px-5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isFetchingNextPage ? "A carregar…" : "Carregar mais"}
             </button>

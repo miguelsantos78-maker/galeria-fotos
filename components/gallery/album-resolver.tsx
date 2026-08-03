@@ -55,28 +55,38 @@ export function AlbumResolver({ token }: { token: string }) {
   const canUpload = permissions.includes("upload");
 
   return (
-    <main className="flex flex-1 flex-col items-center gap-6 px-6 py-16">
-      <div className="text-center">
-        <h1 className="text-foreground text-3xl font-semibold">
+    <main className="flex flex-1 flex-col">
+      <header className="safe-top border-border bg-background/90 sticky top-0 z-10 border-b px-4 py-3 backdrop-blur">
+        <h1 className="text-foreground truncate text-lg font-semibold">
           {album.title}
         </h1>
         {album.description && (
-          <p className="text-foreground/70 mt-2 max-w-xl">
+          <p className="text-foreground/70 mt-0.5 truncate text-xs">
             {album.description}
           </p>
         )}
+      </header>
+
+      <div className="flex flex-1 flex-col pb-24">
+        <PhotoGrid albumId={album.id} downloadEnabled={album.downloadEnabled} />
       </div>
 
       {canUpload && (
         <Link
           href={`/a/${token}/upload`}
-          className="bg-brand-600 hover:bg-brand-700 rounded-full px-5 py-2 text-sm font-medium text-white transition-colors"
+          className="fab-bottom bg-brand-600 hover:bg-brand-700 active:bg-brand-700 fixed right-5 z-20 inline-flex items-center gap-2 rounded-full px-5 py-3.5 text-sm font-medium text-white shadow-lg transition-colors"
         >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="h-4 w-4"
+          >
+            <path d="M10 4a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2h-4v4a1 1 0 1 1-2 0v-4H5a1 1 0 1 1 0-2h4V5a1 1 0 0 1 1-1Z" />
+          </svg>
           Adicionar fotografias
         </Link>
       )}
-
-      <PhotoGrid albumId={album.id} downloadEnabled={album.downloadEnabled} />
     </main>
   );
 }

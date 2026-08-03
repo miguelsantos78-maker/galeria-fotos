@@ -172,7 +172,7 @@ export function Lightbox({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="safe-top flex items-center justify-between gap-3 px-4 py-3">
         <button
           type="button"
           onClick={() => setIsPresenting((current) => !current)}
@@ -231,7 +231,7 @@ export function Lightbox({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-4 px-4 py-4 text-sm text-white/70">
+      <div className="safe-bottom flex flex-wrap items-center justify-center gap-4 px-4 py-4 text-sm text-white/70">
         <span>
           Enviada em {new Date(photo.uploadedAt).toLocaleDateString("pt-PT")}
         </span>

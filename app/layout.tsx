@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
@@ -20,6 +20,20 @@ export const metadata: Metadata = {
   },
   description:
     "Crie e partilhe galerias de fotografias de eventos em tempo real.",
+};
+
+// viewportFit "cover" + os utilitários de safe-area em globals.css
+// deixam a grelha e a barra de ações desenharem-se até às bordas em
+// ecrãs com notch/ilha dinâmica, sem conteúdo escondido atrás deles
+// (uso predominante em telemóvel — secção 10 do CLAUDE.md).
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fafaf9" },
+    { media: "(prefers-color-scheme: dark)", color: "#0c0a09" },
+  ],
 };
 
 export default function RootLayout({

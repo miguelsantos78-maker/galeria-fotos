@@ -64,6 +64,23 @@
 
 body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Espaço para a barra de estado / notch / ilha dinâmica e para a barra
+   de gestos do sistema, em elementos fixos de ecrã inteiro (cabeçalho
+   fixo, FAB, lightbox) — sem efeito em dispositivos sem essas áreas. */
+.safe-top {
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+}
+/* Distância ao fundo do ecrã para elementos fixos (position: fixed),
+   onde padding não tem efeito — soma a barra de gestos do sistema à
+   margem visual pretendida. */
+.fab-bottom {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 1.25rem);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -25,6 +25,7 @@ interface QueueItem {
   id: string;
   clientUploadId: string;
   file: File;
+  previewUrl: string;
   status: QueueStatus;
   progress: number;
   errorMessage?: string;
@@ -85,6 +86,18 @@ export function UploadQueue({ albumId }: { albumId: string }) {
   const [consentGiven, setConsentGiven] = useState(false);
   const xhrByItemId = useRef(new Map<string, XMLHttpRequest>());
   const activeCountRef = useRef(0);
+  const previewUrls = useRef<string[]>([]);
+
+  // As pré-visualizações são locais (URL.createObjectURL) — só fazem
+  // sentido enquanto esta página está montada; libertar a memória ao sair.
+  // O cleanup tem mesmo de ler `.current` no momento em que desmonta (não
+  // uma cópia feita no mount), porque a lista cresce a cada seleção.
+  useEffect(() => {
+    return () => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- ver comentário acima
+      for (const url of previewUrls.current) URL.revokeObjectURL(url);
+    };
+  }, []);
 
   const updateItem = useCallback((id: string, patch: Partial<QueueItem>) => {
     setItems((current) =>
@@ -165,11 +178,15 @@ export function UploadQueue({ albumId }: { albumId: string }) {
 
     const newItems: QueueItem[] = files.map((file) => {
       const id = crypto.randomUUID();
+      const previewUrl = URL.createObjectURL(file);
+      previewUrls.current.push(previewUrl);
+
       if (!ACCEPTED_TYPES.includes(file.type)) {
         return {
           id,
           clientUploadId: crypto.randomUUID(),
           file,
+          previewUrl,
           status: "error",
           progress: 0,
           errorMessage: "Formato não suportado. Envie JPEG, PNG ou WebP.",
@@ -180,6 +197,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
           id,
           clientUploadId: crypto.randomUUID(),
           file,
+          previewUrl,
           status: "error",
           progress: 0,
           errorMessage: "Ficheiro demasiado grande.",
@@ -189,6 +207,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
         id,
         clientUploadId: crypto.randomUUID(),
         file,
+        previewUrl,
         status: "queued",
         progress: 0,
       };
@@ -218,17 +237,13 @@ export function UploadQueue({ albumId }: { albumId: string }) {
   const doneCount = items.filter((item) => item.status === "done").length;
 
   return (
-    <section className="rounded-card border-border bg-surface flex flex-col gap-4 border p-6">
-      <h2 className="text-foreground text-lg font-medium">
-        Adicionar fotografias
-      </h2>
-
+    <div className="flex flex-col gap-4">
       <label className="text-foreground/80 flex items-start gap-2 text-sm">
         <input
           type="checkbox"
           checked={consentGiven}
           onChange={(event) => setConsentGiven(event.target.checked)}
-          className="mt-0.5"
+          className="mt-0.5 h-4 w-4 shrink-0"
         />
         As fotografias que enviar ficam visíveis a todas as pessoas com
         acesso a este álbum. Só envie fotografias que possa partilhar.
@@ -243,11 +258,25 @@ export function UploadQueue({ albumId }: { albumId: string }) {
         }}
         className="border-border rounded-card flex flex-col items-center gap-3 border border-dashed px-6 py-10 text-center"
       >
-        <p className="text-foreground/70 text-sm">
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          className="text-foreground/40 h-10 w-10"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3 16.5V18a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 18v-1.5m-13.5-3L12 9m0 0 4.5 4.5M12 9v9"
+          />
+        </svg>
+        <p className="text-foreground/70 hidden text-sm sm:block">
           Arraste fotografias para aqui, ou
         </p>
-        <div className="flex flex-wrap justify-center gap-3">
-          <label className="bg-brand-600 hover:bg-brand-700 cursor-pointer rounded-full px-5 py-2 text-sm font-medium text-white transition-colors has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:justify-center">
+          <label className="bg-brand-600 hover:bg-brand-700 cursor-pointer rounded-full px-5 py-3 text-center text-sm font-medium text-white transition-colors has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
             Escolher ficheiros
             <input
               type="file"
@@ -261,7 +290,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
               className="sr-only"
             />
           </label>
-          <label className="border-border text-foreground hover:bg-surface-muted cursor-pointer rounded-full border px-5 py-2 text-sm font-medium transition-colors has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
+          <label className="border-border text-foreground hover:bg-surface-muted cursor-pointer rounded-full border px-5 py-3 text-center text-sm font-medium transition-colors has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
             Tirar fotografia
             <input
               type="file"
@@ -295,71 +324,106 @@ export function UploadQueue({ albumId }: { albumId: string }) {
       </div>
 
       {items.length > 0 && (
-        <ul className="flex flex-col gap-2">
+        <ul className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
           {items.map((item) => (
             <li
               key={item.id}
-              className="rounded-card border-border flex items-center gap-3 border px-4 py-2.5 text-sm"
+              className="bg-surface-muted rounded-card relative aspect-square overflow-hidden"
             >
-              <span className="text-foreground/80 flex-1 truncate">
-                {item.file.name}
-              </span>
-
-              {item.status === "queued" && (
-                <span className="text-foreground/70 text-xs">Na fila…</span>
-              )}
+              {/* eslint-disable-next-line @next/next/no-img-element -- pré-visualização local via URL.createObjectURL, nunca um URL remoto. */}
+              <img
+                src={item.previewUrl}
+                alt={item.file.name}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
 
               {item.status === "uploading" && (
-                <div className="flex items-center gap-2">
-                  <div className="bg-surface-muted h-1.5 w-24 overflow-hidden rounded-full">
+                <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-black/60 px-2 py-1.5">
+                  <div className="h-1 overflow-hidden rounded-full bg-white/30">
                     <div
-                      className="bg-brand-600 h-full transition-all"
+                      className="bg-brand-400 h-full transition-all"
                       style={{ width: `${item.progress}%` }}
                     />
                   </div>
-                  <span className="text-foreground/60 w-9 text-right text-xs">
+                  <span className="text-[11px] font-medium text-white">
                     {item.progress}%
                   </span>
                 </div>
               )}
 
+              {item.status === "queued" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                  <span className="rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-medium text-white">
+                    Na fila…
+                  </span>
+                </div>
+              )}
+
               {item.status === "done" && (
-                <span className="text-success text-xs">Enviada</span>
+                <div className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-success">
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-4 w-4"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.8 6.8-6.8a1 1 0 0 1 1.4 0Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
               )}
 
-              {item.status === "canceled" && (
-                <span className="text-foreground/70 text-xs">Cancelada</span>
-              )}
-
-              {item.status === "error" && (
-                <span role="alert" className="text-danger text-xs">
-                  {item.errorMessage}
-                </span>
+              {(item.status === "canceled" || item.status === "error") && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    item.status === "error"
+                      ? handleRetry(item.id)
+                      : undefined
+                  }
+                  aria-label={
+                    item.status === "error"
+                      ? `Tentar novamente: ${item.errorMessage}`
+                      : "Envio cancelado"
+                  }
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 px-2 text-center text-white disabled:cursor-default"
+                  disabled={item.status === "canceled"}
+                >
+                  <span role={item.status === "error" ? "alert" : undefined} className="text-[11px] font-medium">
+                    {item.status === "error" ? item.errorMessage : "Cancelada"}
+                  </span>
+                  {item.status === "error" && (
+                    <span className="text-[11px] font-semibold underline">
+                      Tentar novamente
+                    </span>
+                  )}
+                </button>
               )}
 
               {(item.status === "queued" || item.status === "uploading") && (
                 <button
                   type="button"
                   onClick={() => handleCancel(item.id)}
-                  className="text-foreground/60 hover:text-foreground text-xs underline"
+                  aria-label="Cancelar envio"
+                  className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
                 >
-                  Cancelar
-                </button>
-              )}
-
-              {item.status === "error" && (
-                <button
-                  type="button"
-                  onClick={() => handleRetry(item.id)}
-                  className="text-foreground/60 hover:text-foreground text-xs underline"
-                >
-                  Tentar novamente
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-3.5 w-3.5"
+                  >
+                    <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                  </svg>
                 </button>
               )}
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </div>
   );
 }

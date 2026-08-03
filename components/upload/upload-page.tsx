@@ -74,20 +74,34 @@ export function UploadPage({ token }: { token: string }) {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-12">
-      <div>
+    <main className="flex flex-1 flex-col">
+      <header className="safe-top border-border bg-background/90 sticky top-0 z-10 border-b px-4 py-3 backdrop-blur">
         <Link
           href={`/a/${token}`}
-          className="text-foreground/60 hover:text-foreground text-sm underline"
+          className="text-foreground/60 hover:text-foreground inline-flex items-center gap-1 text-sm"
         >
-          ← Voltar ao álbum
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="h-4 w-4"
+          >
+            <path
+              fillRule="evenodd"
+              d="M12.79 5.23a.75.75 0 0 1 0 1.06L9.06 10l3.73 3.71a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z"
+              clipRule="evenodd"
+            />
+          </svg>
+          Voltar ao álbum
         </Link>
-        <h1 className="text-foreground mt-2 text-2xl font-semibold">
+        <h1 className="text-foreground mt-1 truncate text-lg font-semibold">
           Enviar fotografias — {album.title}
         </h1>
-      </div>
+      </header>
 
-      <UploadQueue albumId={album.id} />
+      <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-5 sm:px-6">
+        <UploadQueue albumId={album.id} />
+      </div>
     </main>
   );
 }
