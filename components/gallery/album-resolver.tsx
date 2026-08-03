@@ -56,7 +56,15 @@ export function AlbumResolver({ token }: { token: string }) {
 
   return (
     <main className="flex flex-1 flex-col">
-      <header className="safe-top from-brand-600/10 border-border border-b bg-gradient-to-b to-transparent px-6 py-12 text-center">
+      <header className="safe-top from-brand-600/15 border-border border-b bg-gradient-to-b to-transparent px-6 pt-20 pb-14 text-center sm:pt-24 sm:pb-16">
+        <div
+          aria-hidden="true"
+          className="mb-5 flex items-center justify-center gap-3"
+        >
+          <span className="bg-brand-600/40 h-px w-10 sm:w-14" />
+          <span className="bg-brand-600 h-1.5 w-1.5 rounded-full" />
+          <span className="bg-brand-600/40 h-px w-10 sm:w-14" />
+        </div>
         <h1 className="text-foreground font-serif text-3xl font-semibold text-balance sm:text-4xl">
           {album.title}
         </h1>
