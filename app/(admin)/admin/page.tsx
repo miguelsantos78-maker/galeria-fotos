@@ -18,10 +18,10 @@ export default async function AdminDashboardPage() {
   });
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-6 py-12">
+    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-6 py-14">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-foreground text-2xl font-semibold">
+          <h1 className="text-foreground font-serif text-2xl font-semibold sm:text-3xl">
             Administração
           </h1>
           <p className="text-foreground/70 text-sm">

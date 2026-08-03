@@ -30,10 +30,10 @@ export default async function AdminLoginPage({
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-24 text-center">
       <div>
-        <h1 className="text-foreground text-2xl font-semibold">
+        <h1 className="text-foreground font-serif text-2xl font-semibold">
           Entrar na administração
         </h1>
-        <p className="text-foreground/70 mt-2 max-w-sm text-sm">
+        <p className="text-foreground/70 mt-3 max-w-sm text-sm">
           Acesso restrito a administradores do LiveGallery.
         </p>
       </div>

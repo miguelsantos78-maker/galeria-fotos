@@ -63,9 +63,11 @@ export function AlbumsList() {
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-14">
       <header className="flex items-center justify-between">
-        <h1 className="text-foreground text-2xl font-semibold">Álbuns</h1>
+        <h1 className="text-foreground font-serif text-2xl font-semibold sm:text-3xl">
+          Álbuns
+        </h1>
         <Link
           href="/admin/settings/integrations"
           className="text-foreground/60 hover:text-foreground text-sm underline-offset-2 hover:underline"

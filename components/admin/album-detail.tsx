@@ -53,13 +53,15 @@ export function AlbumDetail({ albumId }: { albumId: string }) {
   const album = albumQuery.data;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-14">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-foreground text-2xl font-semibold">
+          <h1 className="text-foreground font-serif text-2xl font-semibold sm:text-3xl">
             {album.title}
           </h1>
-          <p className="text-foreground/60 text-sm">Estado: {album.status}</p>
+          <p className="text-foreground/60 mt-1 text-sm">
+            Estado: {album.status}
+          </p>
         </div>
         <div className="flex gap-2">
           {album.status !== "published" && (

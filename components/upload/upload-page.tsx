@@ -41,7 +41,7 @@ export function UploadPage({ token }: { token: string }) {
 
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-24 text-center">
-        <h1 className="text-foreground text-xl font-semibold">
+        <h1 className="text-foreground font-serif text-2xl font-semibold">
           Álbum indisponível
         </h1>
         <p role="alert" className="text-foreground/70 max-w-md text-sm">
@@ -56,7 +56,7 @@ export function UploadPage({ token }: { token: string }) {
   if (!permissions.includes("upload")) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-24 text-center">
-        <h1 className="text-foreground text-xl font-semibold">
+        <h1 className="text-foreground font-serif text-2xl font-semibold">
           O envio de fotografias não está disponível
         </h1>
         <p className="text-foreground/70 max-w-md text-sm">
@@ -94,7 +94,7 @@ export function UploadPage({ token }: { token: string }) {
           </svg>
           Voltar ao álbum
         </Link>
-        <h1 className="text-foreground mt-1 truncate text-lg font-semibold">
+        <h1 className="text-foreground font-serif mt-1 truncate text-lg font-semibold sm:text-xl">
           Enviar fotografias — {album.title}
         </h1>
       </header>
