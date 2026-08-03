@@ -68,7 +68,7 @@ test("um convidado abre um link válido e vê o álbum", async ({ page }) => {
   await expect(page.getByText("Ainda não há fotografias")).toBeVisible();
 });
 
-test("mostra o botão de adicionar fotografias quando a sessão tem permissão de upload", async ({
+test("mostra a área de envio de fotografias quando a sessão tem permissão de upload", async ({
   page,
 }) => {
   await mockResolve(page);
@@ -77,11 +77,12 @@ test("mostra o botão de adicionar fotografias quando a sessão tem permissão d
   await page.goto("/a/token-de-teste");
 
   await expect(
-    page.getByRole("link", { name: "Adicionar fotografias" }),
+    page.getByRole("heading", { name: "Adicionar fotografias" }),
   ).toBeVisible();
+  await expect(page.getByText("Escolher ficheiros")).toBeVisible();
 });
 
-test("esconde o botão de adicionar fotografias sem permissão de upload", async ({
+test("esconde a área de envio de fotografias sem permissão de upload", async ({
   page,
 }) => {
   await mockResolve(page, { permissions: ["view"] });
@@ -90,7 +91,7 @@ test("esconde o botão de adicionar fotografias sem permissão de upload", async
   await page.goto("/a/token-de-teste");
 
   await expect(
-    page.getByRole("link", { name: "Adicionar fotografias" }),
+    page.getByRole("heading", { name: "Adicionar fotografias" }),
   ).toHaveCount(0);
 });
 
