@@ -83,7 +83,6 @@ export function UploadQueue({ albumId }: { albumId: string }) {
   const queryClient = useQueryClient();
   const [items, setItems] = useState<QueueItem[]>([]);
   const [selectionError, setSelectionError] = useState<string | null>(null);
-  const [consentGiven, setConsentGiven] = useState(false);
   const xhrByItemId = useRef(new Map<string, XMLHttpRequest>());
   const activeCountRef = useRef(0);
   const previewUrls = useRef<string[]>([]);
@@ -238,79 +237,19 @@ export function UploadQueue({ albumId }: { albumId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <label className="text-foreground/80 flex items-start gap-2 text-sm">
+      <label className="bg-brand-600 hover:bg-brand-700 flex w-full cursor-pointer items-center justify-center rounded-full px-5 py-3 text-center text-sm font-medium text-white transition-colors">
+        Escolher ou tirar fotografias
         <input
-          type="checkbox"
-          checked={consentGiven}
-          onChange={(event) => setConsentGiven(event.target.checked)}
-          className="mt-0.5 h-4 w-4 shrink-0"
+          type="file"
+          accept={ACCEPTED_TYPES.join(",")}
+          multiple
+          onChange={(event) => {
+            handleFilesSelected(event.target.files);
+            event.target.value = "";
+          }}
+          className="sr-only"
         />
-        As fotografias que enviar ficam visíveis a todas as pessoas com
-        acesso a este álbum. Só envie fotografias que possa partilhar.
       </label>
-
-      <div
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault();
-          if (!consentGiven) return;
-          handleFilesSelected(event.dataTransfer.files);
-        }}
-        className="border-border rounded-card flex flex-col items-center gap-3 border border-dashed px-6 py-10 text-center"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          className="text-foreground/40 h-10 w-10"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M3 16.5V18a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 18v-1.5m-13.5-3L12 9m0 0 4.5 4.5M12 9v9"
-          />
-        </svg>
-        <p className="text-foreground/70 hidden text-sm sm:block">
-          Arraste fotografias para aqui, ou
-        </p>
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:justify-center">
-          <label className="bg-brand-600 hover:bg-brand-700 cursor-pointer rounded-full px-5 py-3 text-center text-sm font-medium text-white transition-colors has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
-            Escolher ficheiros
-            <input
-              type="file"
-              accept={ACCEPTED_TYPES.join(",")}
-              multiple
-              disabled={!consentGiven}
-              onChange={(event) => {
-                handleFilesSelected(event.target.files);
-                event.target.value = "";
-              }}
-              className="sr-only"
-            />
-          </label>
-          <label className="border-border text-foreground hover:bg-surface-muted cursor-pointer rounded-full border px-5 py-3 text-center text-sm font-medium transition-colors has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
-            Tirar fotografia
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              disabled={!consentGiven}
-              onChange={(event) => {
-                handleFilesSelected(event.target.files);
-                event.target.value = "";
-              }}
-              className="sr-only"
-            />
-          </label>
-        </div>
-        {!consentGiven && (
-          <p className="text-foreground/70 text-xs">
-            Aceite as condições acima para poder enviar fotografias.
-          </p>
-        )}
-      </div>
 
       {selectionError && (
         <p role="alert" className="text-danger text-sm">
