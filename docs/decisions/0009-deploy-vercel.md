@@ -76,6 +76,38 @@ implementada nesta fase:
 espelhando o novo valor) foram atualizados para `4_000_000`, com um
 comentário a explicar a origem do número.
 
+### 5. `outputFileTracingIncludes` do sharp: aplicado só à rota que precisa, não a `/api/**/*`
+
+A correção do `ERR_DLOPEN_FAILED` do `sharp` (`serverExternalPackages`
++ `outputFileTracingIncludes`, ver secção "Notas específicas de um
+deploy na Vercel" no checklist de produção) foi aplicada inicialmente
+a todas as rotas de API (`"/api/**/*"`). Isso duplicava os ~18 MB do
+`@img/sharp-libvips-linux-x64` em cada uma das ~20 rotas, e um
+deployment seguinte (só com alterações de UI, sem tocar nesta
+configuração) falhou em "Deploying outputs..." com um erro genérico da
+Vercel — a build do Next.js em si tinha terminado sem problemas
+(confirmado nos Build Logs). Corrigido de duas formas:
+
+1. Restringir a chave a só a rota que importa mesmo `sharp` (via
+   `lib/media/process-image.ts`, chamado só por
+   `server/use-cases/uploads.ts`, usado só pela rota de conclusão de
+   upload) — `"/api/albums/*/uploads/*/complete"`.
+2. **Bug à parte, mais subtil**: a primeira tentativa desta chave mais
+   restrita usava os nomes literais dos parâmetros dinâmicos
+   (`"/api/albums/[albumId]/uploads/[uploadId]/complete/**"`), que não
+   correspondeu a nenhuma rota — o Next.js usa `picomatch` para comparar
+   esta chave com o caminho da rota, e colchetes são sintaxe de classe
+   de carateres do glob (`[albumId]` significa "um caráter de entre
+   a,l,b,u,I,d"), não texto literal. Trocado por `*`, que corresponde a
+   qualquer segmento do caminho independentemente do que a rota real
+   contém nessa posição.
+
+Confirmado localmente (`VERCEL=1 pnpm build`, inspecionando os
+`*.nft.json` gerados): só a rota de conclusão de upload inclui os
+ficheiros do `libvips`; as restantes ~19 rotas (incluindo outras que
+importam `lib/media` só por tipos, sem usar `sharp` diretamente) não
+incluem nada a mais.
+
 ## Limitações conhecidas
 
 - Fotografias originais acima de ~4 MB são rejeitadas na validação do

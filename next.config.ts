@@ -15,8 +15,20 @@ const nextConfig: NextConfig = {
   // sharp/libvips, por isso o .so fica de fora da função serverless
   // implantada mesmo estando presente no node_modules da build. Incluir
   // explicitamente resolve o ERR_DLOPEN_FAILED em runtime.
+  //
+  // Aplicado só à ÚNICA rota que importa "sharp" (via
+  // lib/media/process-image.ts, chamado por server/use-cases/uploads.ts)
+  // — aplicar a "/api/**/*" duplicava os ~18 MB do libvips por cada uma
+  // das ~20 rotas de API e fez o deployment falhar ao exceder um limite
+  // de tamanho da Vercel (ver docs/decisions/0009-deploy-vercel.md).
   outputFileTracingIncludes: {
-    "/api/**/*": [
+    // "*" em vez de "[albumId]"/"[uploadId]" de propósito: o Next usa
+    // picomatch para comparar esta chave com a rota, e colchetes literais
+    // são interpretados como classe de carateres do glob, não como texto —
+    // "[albumId]" nunca correspondia à rota real (bug encontrado ao
+    // confirmar, depois de um deploy falhado, que o ficheiro rastreado
+    // continuava vazio apesar desta configuração).
+    "/api/albums/*/uploads/*/complete": [
       "./node_modules/sharp/**/*",
       "./node_modules/@img/**/*",
       "./node_modules/.pnpm/sharp@*/**/*",
