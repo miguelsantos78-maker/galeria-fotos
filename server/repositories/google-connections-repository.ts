@@ -9,6 +9,9 @@ export interface GoogleConnectionsRepository {
   findActiveByUser(userId: string): Promise<GoogleConnectionRow | null>;
   findLatestByUser(userId: string): Promise<GoogleConnectionRow | null>;
   findById(id: string): Promise<GoogleConnectionRow | null>;
+  /** Todas as ligações ativas, de qualquer utilizador — usado pela
+   * sincronização periódica (`server/use-cases/drive-sync.ts`). */
+  listAllActive(): Promise<GoogleConnectionRow[]>;
   insert(input: GoogleConnectionInsert): Promise<GoogleConnectionRow>;
   update(id: string, patch: GoogleConnectionUpdate): Promise<GoogleConnectionRow | null>;
 }
@@ -52,6 +55,16 @@ export function createGoogleConnectionsRepository(
         .select("*")
         .eq("id", id)
         .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+
+    async listAllActive() {
+      const { data, error } = await db
+        .from("google_connections")
+        .select("*")
+        .eq("status", "active");
 
       if (error) throw error;
       return data;

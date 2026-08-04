@@ -216,6 +216,9 @@ export function createFakeGoogleConnectionsRepository(
     async findById(id) {
       return rows.find((row) => row.id === id) ?? null;
     },
+    async listAllActive() {
+      return rows.filter((row) => row.status === "active");
+    },
     async insert(input) {
       const row: GoogleConnectionRow = {
         id: input.id ?? nextId("connection"),

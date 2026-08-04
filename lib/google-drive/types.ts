@@ -38,4 +38,11 @@ export interface DriveStorageProvider {
   getOriginalStream(input: { fileId: string }): Promise<NodeJS.ReadableStream>;
   deleteFile(input: { fileId: string }): Promise<void>;
   verifyConnection(): Promise<ConnectionHealth>;
+  /**
+   * IDs (`appProperties.liveGalleryPhotoId`) de todas as fotografias
+   * ainda presentes (não na reciclagem) no Drive desta ligação — usado
+   * para detetar fotografias apagadas diretamente no Drive, fora da
+   * aplicação (`server/use-cases/drive-sync.ts`).
+   */
+  listActivePhotoIds(): Promise<Set<string>>;
 }

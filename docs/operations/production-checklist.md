@@ -41,6 +41,17 @@ implantação, para não se repetirem:
 - **Variáveis `NEXT_PUBLIC_*`**: qualquer alteração só tem efeito depois
   de um novo deploy (ficam embutidas no código no momento da build) —
   um "Redeploy" simples chega, não é preciso alterar código.
+- **`CRON_SECRET` e sincronização com o Drive**: `vercel.json` define um
+  Cron Job diário (`/api/cron/sync-drive-deletions`, ver
+  `server/use-cases/drive-sync.ts`) que apaga na aplicação as
+  fotografias apagadas diretamente no Google Drive. Gerar um valor com
+  `openssl rand -hex 32` e configurar em Project Settings → Environment
+  Variables com o nome exato `CRON_SECRET` — a Vercel injeta-o
+  automaticamente como `Authorization: Bearer <valor>` nas chamadas do
+  Cron Job; sem esta variável a rota recusa sempre o pedido (falha
+  fechada). No plano Hobby, os Cron Jobs só podem correr uma vez por
+  dia — a sincronização não é em tempo real, pode demorar até ~24h a
+  refletir uma eliminação feita no Drive.
 
 ## 1. Antes da primeira implantação
 
@@ -99,6 +110,7 @@ recomendado para o Cloud Run — nunca em ficheiros `.env` commitados):
 | `ADMIN_EMAILS` | Lista separada por vírgulas dos primeiros administradores (secção 6.1) — só necessário até o primeiro admin ter `profiles.role = 'admin'` |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Opcionais, mas fortemente recomendados em produção — sem eles, o rate limiting (secção 15, `lib/security/rate-limit.ts`) fica desligado |
 | `SENTRY_DSN` | Opcional (secção 18) |
+| `CRON_SECRET` | `openssl rand -hex 32` — protege `/api/cron/sync-drive-deletions` (ver secção 0 acima); sem esta variável a sincronização com eliminações no Drive fica desligada |
 
 Nunca reutilizar `APP_ENCRYPTION_KEY`/`APP_TOKEN_PEPPER` entre
 desenvolvimento e produção. Rodar `APP_ENCRYPTION_KEY` implica

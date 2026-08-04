@@ -11,6 +11,7 @@ import { decryptSecret } from "@/lib/security/encryption";
 import { createAuthenticatedClient } from "@/lib/google-drive/oauth-client";
 import { createDriveStorageProvider } from "@/lib/google-drive/drive-provider";
 import { buildThumbnailPath } from "@/lib/media/storage-paths";
+import { finalizePhotoRemoval } from "./photo-removal";
 import { toAdminPhotoView, type AdminPhotoView } from "./admin-photo-view";
 import type {
   BatchModerateInput,
@@ -204,32 +205,7 @@ export async function deletePhoto(
   // Idempotente do lado do adaptador: um 404 do Drive é tratado como sucesso.
   await provider.deleteFile({ fileId: photo.drive_file_id });
 
-  const thumbnailPath = buildThumbnailPath(photo.album_id, photo.id);
-  const pathsToRemove = photo.preview_path
-    ? [photo.preview_path, thumbnailPath]
-    : [thumbnailPath];
-  await deps.previewStorage.remove(pathsToRemove).catch(() => {
-    // Falha a limpar a Storage não bloqueia a eliminação: o original já
-    // saiu do Drive, que é o que importa para custo/privacidade; um
-    // preview órfão sem original associado é um resíduo menor.
-  });
-
-  await deps.photos.update(photoId, {
-    status: "deleted",
-    deleted_at: new Date().toISOString(),
-  });
-
-  if (album.cover_photo_id === photoId) {
-    await deps.albums.update(album.id, { cover_photo_id: null });
-  }
-
-  await deps.auditLog.record({
-    actor_user_id: ownerId,
-    album_id: album.id,
-    photo_id: photoId,
-    action: "photo.deleted",
-    metadata: { originalFilename: photo.original_filename },
-  });
+  await finalizePhotoRemoval(photo, album, "photo.deleted", ownerId, deps);
 }
 
 export interface BatchModerationResult {

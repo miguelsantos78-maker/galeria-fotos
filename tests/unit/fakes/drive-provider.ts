@@ -16,11 +16,14 @@ interface FakeDriveState {
   createAlbumFolderCalls: { parentFolderId: string; albumId: string; title: string }[];
   deletedFileIds: string[];
   originalContentByFileId: Map<string, Buffer>;
+  /** IDs devolvidos por `listActivePhotoIds()` — mutável nos testes para
+   * simular fotografias apagadas diretamente no Drive. */
+  activePhotoIds: Set<string>;
 }
 
 /** Adaptador falso para testes (secção 19/22) — não chama a API real do Google. */
 export function createFakeDriveStorageProvider(
-  overrides: Partial<{ health: ConnectionHealth }> = {},
+  overrides: Partial<{ health: ConnectionHealth; activePhotoIds: Set<string> }> = {},
 ): DriveStorageProvider & { state: FakeDriveState } {
   const state: FakeDriveState = {
     health: overrides.health ?? { ok: true, accountEmail: "owner@example.com" },
@@ -28,6 +31,7 @@ export function createFakeDriveStorageProvider(
     createAlbumFolderCalls: [],
     deletedFileIds: [],
     originalContentByFileId: new Map(),
+    activePhotoIds: overrides.activePhotoIds ?? new Set(),
   };
 
   return {
@@ -59,6 +63,9 @@ export function createFakeDriveStorageProvider(
     },
     async verifyConnection() {
       return state.health;
+    },
+    async listActivePhotoIds() {
+      return state.activePhotoIds;
     },
   };
 }

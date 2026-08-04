@@ -37,6 +37,13 @@ const serverEnvSchema = publicEnvSchema.extend({
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
   SENTRY_DSN: z.url().optional(),
 
+  // Autoriza chamadas a /api/cron/* (secção 11/26 — sincronização com
+  // eliminações feitas diretamente no Drive). A Vercel envia
+  // automaticamente "Authorization: Bearer <CRON_SECRET>" nos Cron Jobs
+  // quando esta variável existe com este nome exato. Sem ela, a rota
+  // fecha por omissão (falha fechada) — nunca corre "aberta".
+  CRON_SECRET: z.string().min(16).optional(),
+
   // Lista de bootstrap para o primeiro administrador (secção 6.1): emails
   // separados por vírgula que são sempre tratados como admin, mesmo antes
   // de existir alguém com profiles.role = 'admin' na base de dados. Ver

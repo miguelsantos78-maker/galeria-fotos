@@ -148,6 +148,30 @@ export function createDriveStorageProvider(
         };
       }
     },
+
+    async listActivePhotoIds() {
+      const photoIds = new Set<string>();
+      let pageToken: string | undefined;
+
+      do {
+        const response = await drive.files.list({
+          q: "appProperties has { key='liveGalleryPhotoId' } and trashed = false",
+          fields: "nextPageToken, files(appProperties)",
+          spaces: "drive",
+          pageSize: 1000,
+          pageToken,
+        });
+
+        for (const file of response.data.files ?? []) {
+          const photoId = file.appProperties?.liveGalleryPhotoId;
+          if (photoId) photoIds.add(photoId);
+        }
+
+        pageToken = response.data.nextPageToken ?? undefined;
+      } while (pageToken);
+
+      return photoIds;
+    },
   };
 }
 
