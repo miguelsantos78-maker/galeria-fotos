@@ -7,6 +7,7 @@ import { resolveAlbumSession } from "@/server/use-cases/resolve-album";
 import { resolveAlbumSchema } from "@/lib/validation/share-link";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { AppError, jsonError, jsonOk, newRequestId } from "@/lib/api/response";
+import { logger } from "@/lib/observability/logger";
 
 /**
  * Troca um token de partilha por uma album_session (secção 14). Se o
@@ -40,6 +41,13 @@ export async function POST(request: Request) {
     if (!user) {
       const { data, error } = await supabase.auth.signInAnonymously();
       if (error || !data.user) {
+        logger.error({
+          operation: "albums.resolve.signInAnonymously",
+          requestId,
+          message: error?.message ?? "sem utilizador devolvido",
+          status: error?.status ?? null,
+          code: error?.code ?? null,
+        });
         throw new AppError(
           "SESSION_UNAVAILABLE",
           "Não foi possível iniciar uma sessão de visitante. Tente novamente.",
