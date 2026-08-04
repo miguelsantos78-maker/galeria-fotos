@@ -7,6 +7,8 @@ import {
   useState,
   type TouchEvent,
 } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api/client";
 import type { PublicPhoto } from "@/server/use-cases/photos";
 
 const AUTO_ADVANCE_INTERVAL_MS = 5000;
@@ -24,26 +26,38 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
  * Lightbox de ecrã inteiro (secção 10.2), com o "modo apresentação"
  * (secção 10.1/22) como uma variante do mesmo componente: avança
  * automaticamente enquanto `isPresenting` está ativo, respeitando
- * `prefers-reduced-motion` (secção 17). As ações "destacar"/"eliminar"
- * ficam para a Fase 6 (moderação) — não fazem parte deste componente.
+ * `prefers-reduced-motion` (secção 17). "Eliminar" só aparece para o
+ * dono do álbum (`isOwner`, resolvido no servidor em
+ * `resolveAlbumSession` — nunca confiado apenas no cliente: o endpoint
+ * `DELETE /api/photos/[photoId]` volta a validar a sessão de
+ * administrador e a posse do álbum).
  */
 export function Lightbox({
   photos,
   initialIndex,
   downloadEnabled,
+  isOwner,
   startInPresentationMode = false,
   onClose,
   onIndexChange,
+  onDeleted,
 }: {
   photos: PublicPhoto[];
   initialIndex: number;
   downloadEnabled: boolean;
+  isOwner: boolean;
   startInPresentationMode?: boolean;
   onClose: () => void;
   onIndexChange?: (photoId: string) => void;
+  onDeleted: (photoId: string) => void;
 }) {
   const [index, setIndex] = useState(initialIndex);
   const [isPresenting, setIsPresenting] = useState(startInPresentationMode);
+  const deleteMutation = useMutation({
+    mutationFn: (photoId: string) =>
+      apiFetch(`/api/photos/${photoId}`, { method: "DELETE" }),
+    onSuccess: (_data, photoId) => onDeleted(photoId),
+  });
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const touchStartX = useRef<number | null>(null);
@@ -214,19 +228,46 @@ export function Lightbox({
         )}
       </div>
 
-      <div className="safe-bottom flex flex-wrap items-center justify-center gap-4 px-4 py-4 text-sm text-white/70">
-        <span>
-          Enviada em {new Date(photo.uploadedAt).toLocaleDateString("pt-PT")}
-        </span>
+      <div className="safe-bottom flex flex-col items-center gap-2 px-4 py-4">
+        <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-white/70">
+          <span>
+            Enviada em {new Date(photo.uploadedAt).toLocaleDateString("pt-PT")}
+          </span>
 
-        {downloadEnabled && (
-          <a
-            href={`/api/media/${photo.id}/original`}
-            download
-            className="rounded-full border border-white/30 px-4 py-1.5 font-medium text-white transition-colors hover:bg-white/10"
-          >
-            Transferir
-          </a>
+          {downloadEnabled && (
+            <a
+              href={`/api/media/${photo.id}/original`}
+              download
+              className="rounded-full border border-white/30 px-4 py-1.5 font-medium text-white transition-colors hover:bg-white/10"
+            >
+              Transferir
+            </a>
+          )}
+
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Eliminar esta fotografia? Esta ação não pode ser desfeita.",
+                  )
+                ) {
+                  deleteMutation.mutate(photo.id);
+                }
+              }}
+              disabled={deleteMutation.isPending}
+              className="border-danger/60 text-danger rounded-full border px-4 py-1.5 font-medium transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {deleteMutation.isPending ? "A eliminar…" : "Eliminar"}
+            </button>
+          )}
+        </div>
+
+        {deleteMutation.isError && (
+          <p role="alert" className="text-danger text-xs">
+            Não foi possível eliminar a fotografia. Tente novamente.
+          </p>
         )}
       </div>
     </div>

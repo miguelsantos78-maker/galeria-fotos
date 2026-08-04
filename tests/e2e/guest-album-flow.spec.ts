@@ -24,6 +24,7 @@ const RESOLVED_ALBUM = {
     eventEndAt: null,
   },
   permissions: ["view", "upload"],
+  isOwner: false,
 };
 
 async function mockResolve(

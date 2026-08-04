@@ -31,6 +31,16 @@ export interface PublicAlbumView {
 export interface ResolveAlbumResult {
   album: PublicAlbumView;
   permissions: AlbumSessionPermission[];
+  /**
+   * `true` só quando quem abriu o link está autenticado (não anónimo)
+   * como o próprio dono do álbum — nunca depende das `permissions` do
+   * link de partilha, que também podem ser vistas por um convidado.
+   * Controla apenas a exibição de ações de administrador na galeria
+   * pública (ex.: eliminar fotografia); a autorização real continua a
+   * ser validada de novo no servidor em cada pedido (`requireAdminApi`
+   * + verificação de `owner_id` em `deletePhoto`).
+   */
+  isOwner: boolean;
 }
 
 interface ResolveDeps {
@@ -48,7 +58,7 @@ interface ResolveDeps {
  */
 export async function resolveAlbumSession(
   input: ResolveAlbumInput,
-  ctx: { userId: string },
+  ctx: { userId: string; isAnonymous: boolean },
   deps: ResolveDeps,
 ): Promise<ResolveAlbumResult> {
   const tokenHash = hashShareToken(
@@ -91,6 +101,8 @@ export async function resolveAlbumSession(
     ? link.permissions
     : link.permissions.filter((permission) => permission !== "upload");
 
+  const isOwner = !ctx.isAnonymous && ctx.userId === album.owner_id;
+
   const sessionExpiresAt = new Date(
     Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000,
   );
@@ -108,7 +120,7 @@ export async function resolveAlbumSession(
     expires_at: expiresAt,
   });
 
-  return { album: toPublicAlbumView(album), permissions };
+  return { album: toPublicAlbumView(album), permissions, isOwner };
 }
 
 function isLinkCurrentlyValid(link: {

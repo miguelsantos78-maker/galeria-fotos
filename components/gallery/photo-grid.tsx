@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api/client";
 import type { ListPhotosResult } from "@/server/use-cases/photos";
@@ -23,14 +23,17 @@ import { Lightbox } from "./lightbox";
 export function PhotoGrid({
   albumId,
   downloadEnabled,
+  isOwner,
 }: {
   albumId: string;
   downloadEnabled: boolean;
+  isOwner: boolean;
 }) {
   const { isConnected } = usePhotosRealtime(albumId);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
 
   const query = useInfiniteQuery({
     queryKey: ["albums", albumId, "photos"],
@@ -84,6 +87,12 @@ export function PhotoGrid({
   function handleClose() {
     setPresenting(false);
     updatePhotoParam(null);
+  }
+
+  function handleDeleted() {
+    setPresenting(false);
+    updatePhotoParam(null);
+    queryClient.invalidateQueries({ queryKey: ["albums", albumId, "photos"] });
   }
 
   function openPresentation() {
@@ -185,9 +194,11 @@ export function PhotoGrid({
           photos={photos}
           initialIndex={openIndex}
           downloadEnabled={downloadEnabled}
+          isOwner={isOwner}
           startInPresentationMode={presenting}
           onClose={handleClose}
           onIndexChange={updatePhotoParam}
+          onDeleted={handleDeleted}
         />
       )}
     </div>

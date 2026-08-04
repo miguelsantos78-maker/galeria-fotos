@@ -51,7 +51,7 @@ export function AlbumResolver({ token }: { token: string }) {
     );
   }
 
-  const { album, permissions } = mutation.data;
+  const { album, permissions, isOwner } = mutation.data;
   const canUpload = permissions.includes("upload");
 
   return (
@@ -103,7 +103,11 @@ export function AlbumResolver({ token }: { token: string }) {
       )}
 
       <div className="flex flex-1 flex-col">
-        <PhotoGrid albumId={album.id} downloadEnabled={album.downloadEnabled} />
+        <PhotoGrid
+          albumId={album.id}
+          downloadEnabled={album.downloadEnabled}
+          isOwner={isOwner}
+        />
       </div>
     </main>
   );

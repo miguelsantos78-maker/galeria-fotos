@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     const adminClient = createSupabaseAdminClient();
     const result = await resolveAlbumSession(
       input,
-      { userId: user.id },
+      { userId: user.id, isAnonymous: user.is_anonymous ?? false },
       {
         albums: createAlbumsRepository(adminClient),
         shareLinks: createShareLinksRepository(adminClient),

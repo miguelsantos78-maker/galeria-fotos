@@ -67,7 +67,7 @@ describe("resolveAlbumSession", () => {
 
     const result = await resolveAlbumSession(
       { token },
-      { userId: "guest-1" },
+      { userId: "guest-1", isAnonymous: true },
       { albums, shareLinks, sessions },
     );
 
@@ -83,7 +83,7 @@ describe("resolveAlbumSession", () => {
     await expect(
       resolveAlbumSession(
         { token: "token-errado" },
-        { userId: "guest-1" },
+        { userId: "guest-1", isAnonymous: true },
         { albums, shareLinks, sessions },
       ),
     ).rejects.toMatchObject({ code: "ALBUM_LINK_INVALID" });
@@ -97,7 +97,7 @@ describe("resolveAlbumSession", () => {
     await expect(
       resolveAlbumSession(
         { token },
-        { userId: "guest-1" },
+        { userId: "guest-1", isAnonymous: true },
         { albums, shareLinks, sessions },
       ),
     ).rejects.toMatchObject({ code: "ALBUM_LINK_INVALID" });
@@ -111,7 +111,7 @@ describe("resolveAlbumSession", () => {
     await expect(
       resolveAlbumSession(
         { token },
-        { userId: "guest-1" },
+        { userId: "guest-1", isAnonymous: true },
         { albums, shareLinks, sessions },
       ),
     ).rejects.toMatchObject({ code: "ALBUM_LINK_INVALID" });
@@ -125,7 +125,7 @@ describe("resolveAlbumSession", () => {
     await expect(
       resolveAlbumSession(
         { token },
-        { userId: "guest-1" },
+        { userId: "guest-1", isAnonymous: true },
         { albums, shareLinks, sessions },
       ),
     ).rejects.toMatchObject({ code: "ALBUM_LINK_INVALID" });
@@ -139,7 +139,7 @@ describe("resolveAlbumSession", () => {
     await expect(
       resolveAlbumSession(
         { token },
-        { userId: "guest-1" },
+        { userId: "guest-1", isAnonymous: true },
         { albums, shareLinks, sessions },
       ),
     ).rejects.toMatchObject({ code: "ALBUM_PIN_REQUIRED" });
@@ -153,7 +153,7 @@ describe("resolveAlbumSession", () => {
     await expect(
       resolveAlbumSession(
         { token, pin: "0000" },
-        { userId: "guest-1" },
+        { userId: "guest-1", isAnonymous: true },
         { albums, shareLinks, sessions },
       ),
     ).rejects.toMatchObject({ code: "ALBUM_PIN_INVALID" });
@@ -166,7 +166,7 @@ describe("resolveAlbumSession", () => {
 
     const result = await resolveAlbumSession(
       { token, pin: "1234" },
-      { userId: "guest-1" },
+      { userId: "guest-1", isAnonymous: true },
       { albums, shareLinks, sessions },
     );
 
@@ -181,10 +181,52 @@ describe("resolveAlbumSession", () => {
 
     const result = await resolveAlbumSession(
       { token },
-      { userId: "guest-1" },
+      { userId: "guest-1", isAnonymous: true },
       { albums, shareLinks, sessions },
     );
 
     expect(result.permissions).toEqual(["view"]);
+  });
+
+  it("isOwner é true para o dono do álbum autenticado (não anónimo)", async () => {
+    const { token, albums, shareLinks, sessions, album } = setup({
+      album: { owner_id: "owner-1" },
+    });
+
+    const result = await resolveAlbumSession(
+      { token },
+      { userId: album.owner_id, isAnonymous: false },
+      { albums, shareLinks, sessions },
+    );
+
+    expect(result.isOwner).toBe(true);
+  });
+
+  it("isOwner é false para um convidado anónimo, mesmo com o mesmo user_id do dono", async () => {
+    const { token, albums, shareLinks, sessions, album } = setup({
+      album: { owner_id: "owner-1" },
+    });
+
+    const result = await resolveAlbumSession(
+      { token },
+      { userId: album.owner_id, isAnonymous: true },
+      { albums, shareLinks, sessions },
+    );
+
+    expect(result.isOwner).toBe(false);
+  });
+
+  it("isOwner é false para um utilizador autenticado que não é o dono", async () => {
+    const { token, albums, shareLinks, sessions } = setup({
+      album: { owner_id: "owner-1" },
+    });
+
+    const result = await resolveAlbumSession(
+      { token },
+      { userId: "outro-utilizador", isAnonymous: false },
+      { albums, shareLinks, sessions },
+    );
+
+    expect(result.isOwner).toBe(false);
   });
 });
