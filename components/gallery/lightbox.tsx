@@ -22,6 +22,12 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
   );
 }
 
+/** Deslocamentos à volta da fotografia atual que chegam a ser desenhados
+ * (secção 10.2: "imagem ajustada ao ecrã") — a anterior e a seguinte
+ * espreitam parcialmente dos lados, o resto da lista nem chega a
+ * montar (pode ter dezenas de fotografias). */
+const VISIBLE_OFFSETS = [-1, 0, 1] as const;
+
 /**
  * Lightbox de ecrã inteiro (secção 10.2), com o "modo apresentação"
  * (secção 10.1/22) como uma variante do mesmo componente: avança
@@ -31,6 +37,13 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
  * `resolveAlbumSession` — nunca confiado apenas no cliente: o endpoint
  * `DELETE /api/photos/[photoId]` volta a validar a sessão de
  * administrador e a posse do álbum).
+ *
+ * Em vez de um fundo preto sólido a cobrir a página, o diálogo abre
+ * sobre a própria galeria com um véu semitransparente desfocado
+ * (`backdrop-filter: blur`, a mesma técnica do cabeçalho com
+ * fotografia de capa — ADR 0023) — a fotografia atual aparece num
+ * cartão arredondado, com a anterior/seguinte a espreitar dos lados
+ * (ADR 0024), em vez de ocupar o ecrã inteiro.
  */
 export function Lightbox({
   photos,
@@ -165,7 +178,7 @@ export function Lightbox({
       role="dialog"
       aria-modal="true"
       aria-label="Visualização de fotografia"
-      className="fixed inset-0 z-50 flex flex-col bg-black/95"
+      className="fixed inset-0 z-50 flex flex-col bg-black/35 backdrop-blur-2xl"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -193,27 +206,51 @@ export function Lightbox({
         </button>
       </div>
 
-      <div className="relative flex flex-1 items-center justify-center px-4">
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden">
+        {VISIBLE_OFFSETS.map((offset) => {
+          const slideIndex = index + offset;
+          const slidePhoto = photos[slideIndex];
+          if (!slidePhoto) return null;
+          const isCurrent = offset === 0;
+
+          return (
+            <div
+              key={slidePhoto.id}
+              aria-hidden={!isCurrent}
+              className={`rounded-card absolute top-1/2 left-1/2 h-[68%] w-[78%] max-w-xl overflow-hidden bg-black/30 shadow-2xl transition-[transform,opacity] duration-300 sm:w-[62%] ${isCurrent ? "" : "pointer-events-none"}`}
+              style={{
+                transform: `translate(-50%, -50%) translateX(${offset * 88}%) scale(${isCurrent ? 1 : 0.85})`,
+                opacity: isCurrent ? 1 : 0.45,
+                zIndex: isCurrent ? 2 : 1,
+              }}
+            >
+              {slidePhoto.previewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- URL assinado de um domínio de Storage dinâmico (por instalação); ver docs/decisions/0005.
+                <img
+                  src={slidePhoto.previewUrl}
+                  alt={isCurrent ? "Fotografia do álbum" : ""}
+                  className="h-full w-full object-contain"
+                />
+              ) : (
+                isCurrent && (
+                  <p className="flex h-full items-center justify-center text-sm text-white/60">
+                    A carregar…
+                  </p>
+                )
+              )}
+            </div>
+          );
+        })}
+
         {hasPrev && (
           <button
             type="button"
             onClick={goPrev}
             aria-label="Fotografia anterior"
-            className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full border border-white/30 p-3 text-lg text-white transition-colors hover:bg-white/10 sm:left-4"
+            className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/30 bg-black/20 p-3 text-lg text-white transition-colors hover:bg-white/10 sm:left-4"
           >
             ‹
           </button>
-        )}
-
-        {photo.previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- URL assinado de um domínio de Storage dinâmico (por instalação); ver docs/decisions/0005.
-          <img
-            src={photo.previewUrl}
-            alt="Fotografia do álbum"
-            className="max-h-full max-w-full object-contain"
-          />
-        ) : (
-          <p className="text-sm text-white/60">A carregar…</p>
         )}
 
         {hasNext && (
@@ -221,7 +258,7 @@ export function Lightbox({
             type="button"
             onClick={goNext}
             aria-label="Próxima fotografia"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full border border-white/30 p-3 text-lg text-white transition-colors hover:bg-white/10 sm:right-4"
+            className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/30 bg-black/20 p-3 text-lg text-white transition-colors hover:bg-white/10 sm:right-4"
           >
             ›
           </button>

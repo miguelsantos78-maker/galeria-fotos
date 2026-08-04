@@ -22,7 +22,7 @@ const RESOLVED_ALBUM = {
     downloadEnabled: true,
     eventStartAt: null,
     eventEndAt: null,
-    coverPhotoUrl: null,
+    coverPhotoUrl: null as string | null,
   },
   permissions: ["view", "upload"],
   isOwner: false,
