@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
+import {
+  CLIENT_OPTIMIZE_TRIGGER_BYTES,
+  optimizeImageFile,
+} from "@/lib/media/client-image-optimizer";
 
 /**
  * Espelham os valores por omissão de `MAX_UPLOAD_BYTES`/
@@ -18,6 +22,7 @@ const MAX_FILE_BYTES = 4_000_000;
 const MAX_FILES = 50;
 const MAX_CONCURRENT_UPLOADS = 3;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const TOO_LARGE_MESSAGE = "Ficheiro demasiado grande.";
 
 /**
  * Substitui a pré-visualização por um ícone genérico quando o
@@ -28,7 +33,13 @@ const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const FALLBACK_PREVIEW =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' fill='%23e5e0da'/%3E%3Cpath d='M8 34l9-11 7 8 5-6 11 9v2H8z' fill='%23b8ada0'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23b8ada0'/%3E%3C/svg%3E";
 
-type QueueStatus = "queued" | "uploading" | "done" | "error" | "canceled";
+type QueueStatus =
+  | "optimizing"
+  | "queued"
+  | "uploading"
+  | "done"
+  | "error"
+  | "canceled";
 
 interface QueueItem {
   id: string;
@@ -38,9 +49,18 @@ interface QueueItem {
   status: QueueStatus;
   progress: number;
   errorMessage?: string;
+  errorCode?: string;
 }
 
 class UploadCanceledError extends Error {}
+
+class UploadHttpError extends Error {
+  code: string;
+  constructor(message: string, code: string) {
+    super(message);
+    this.code = code;
+  }
+}
 
 function uploadFileWithProgress(options: {
   url: string;
@@ -64,15 +84,17 @@ function uploadFileWithProgress(options: {
         return;
       }
       let message = "Não foi possível enviar esta fotografia.";
+      let code = "UNKNOWN_ERROR";
       try {
         const body = JSON.parse(xhr.responseText) as {
-          error?: { message?: string };
+          error?: { message?: string; code?: string };
         };
         if (body.error?.message) message = body.error.message;
+        if (body.error?.code) code = body.error.code;
       } catch {
-        // A resposta não é JSON — mantém a mensagem genérica.
+        // A resposta não é JSON — mantém a mensagem/código genéricos.
       }
-      reject(new Error(message));
+      reject(new UploadHttpError(message, code));
     });
 
     xhr.addEventListener("error", () =>
@@ -153,6 +175,8 @@ export function UploadQueue({ albumId }: { albumId: string }) {
               error instanceof Error
                 ? error.message
                 : "Não foi possível enviar esta fotografia.",
+            errorCode:
+              error instanceof UploadHttpError ? error.code : undefined,
           });
         }
       } finally {
@@ -171,6 +195,31 @@ export function UploadQueue({ albumId }: { albumId: string }) {
       void runUpload(item);
     }
   }, [items, runUpload]);
+
+  // Fotos grandes (câmara de telemóvel facilmente excede o limite de
+  // 4 MB por pedido) são otimizadas no browser antes de entrarem na
+  // fila de envio — ver lib/media/client-image-optimizer.ts.
+  const optimizeItem = useCallback(
+    async (item: QueueItem) => {
+      const optimized = await optimizeImageFile(item.file);
+
+      let previewUrl = item.previewUrl;
+      if (optimized !== item.file) {
+        previewUrl = URL.createObjectURL(optimized);
+        previewUrls.current.push(previewUrl);
+        URL.revokeObjectURL(item.previewUrl);
+      }
+
+      const tooLarge = optimized.size > MAX_FILE_BYTES;
+      updateItem(item.id, {
+        file: optimized,
+        previewUrl,
+        status: tooLarge ? "error" : "queued",
+        errorMessage: tooLarge ? TOO_LARGE_MESSAGE : undefined,
+      });
+    },
+    [updateItem],
+  );
 
   function handleFilesSelected(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
@@ -200,15 +249,16 @@ export function UploadQueue({ albumId }: { albumId: string }) {
           errorMessage: "Formato não suportado. Envie JPEG, PNG ou WebP.",
         };
       }
-      if (file.size > MAX_FILE_BYTES) {
+      // Ficheiros grandes passam primeiro pelo otimizador — só depois
+      // (já mais pequenos, na maioria dos casos) é validado o limite.
+      if (file.size > CLIENT_OPTIMIZE_TRIGGER_BYTES) {
         return {
           id,
           clientUploadId: crypto.randomUUID(),
           file,
           previewUrl,
-          status: "error",
+          status: "optimizing",
           progress: 0,
-          errorMessage: "Ficheiro demasiado grande.",
         };
       }
       return {
@@ -222,6 +272,9 @@ export function UploadQueue({ albumId }: { albumId: string }) {
     });
 
     setItems((current) => [...current, ...newItems]);
+    for (const item of newItems) {
+      if (item.status === "optimizing") void optimizeItem(item);
+    }
   }
 
   function handleCancel(itemId: string) {
@@ -238,8 +291,13 @@ export function UploadQueue({ albumId }: { albumId: string }) {
       status: "queued",
       progress: 0,
       errorMessage: undefined,
+      errorCode: undefined,
       clientUploadId: crypto.randomUUID(),
     });
+  }
+
+  function handleDismiss(itemId: string) {
+    setItems((current) => current.filter((item) => item.id !== itemId));
   }
 
   const doneCount = items.filter((item) => item.status === "done").length;
@@ -303,6 +361,14 @@ export function UploadQueue({ albumId }: { albumId: string }) {
                 </div>
               )}
 
+              {item.status === "optimizing" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                  <span className="rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-medium text-white">
+                    A otimizar…
+                  </span>
+                </div>
+              )}
+
               {item.status === "queued" && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                   <span className="rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-medium text-white">
@@ -328,31 +394,65 @@ export function UploadQueue({ albumId }: { albumId: string }) {
                 </div>
               )}
 
-              {(item.status === "canceled" || item.status === "error") && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    item.status === "error"
-                      ? handleRetry(item.id)
-                      : undefined
-                  }
-                  aria-label={
-                    item.status === "error"
-                      ? `Tentar novamente: ${item.errorMessage}`
-                      : "Envio cancelado"
-                  }
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 px-2 text-center text-white disabled:cursor-default"
-                  disabled={item.status === "canceled"}
+              {item.status === "canceled" && (
+                <div
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 px-2 text-center text-white"
+                  aria-label="Envio cancelado"
                 >
-                  <span role={item.status === "error" ? "alert" : undefined} className="text-[11px] font-medium">
-                    {item.status === "error" ? item.errorMessage : "Cancelada"}
+                  <span className="text-[11px] font-medium">Cancelada</span>
+                </div>
+              )}
+
+              {/* Duplicado (secção 13): não é um erro no sentido habitual
+                  — a fotografia já está no álbum — por isso usa um tom
+                  de aviso (âmbar), enquadrado com o resto da interface,
+                  em vez do vermelho/preto genérico de falha. */}
+              {item.status === "error" && item.errorCode === "PHOTO_DUPLICATE" ? (
+                <div
+                  role="status"
+                  className="bg-surface/95 border-warning/40 absolute inset-0 flex flex-col items-center justify-center gap-1.5 border px-2 text-center"
+                >
+                  <span className="bg-warning/15 text-warning flex h-7 w-7 items-center justify-center rounded-full">
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="h-4 w-4"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M18 10A8 8 0 1 1 2 10a8 8 0 0 1 16 0Zm-8-5a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 8.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
                   </span>
-                  {item.status === "error" && (
+                  <span className="text-foreground text-[11px] font-medium leading-snug">
+                    Já enviada para este álbum
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleDismiss(item.id)}
+                    className="text-brand-600 text-[11px] font-semibold underline"
+                  >
+                    Remover
+                  </button>
+                </div>
+              ) : (
+                item.status === "error" && (
+                  <button
+                    type="button"
+                    onClick={() => handleRetry(item.id)}
+                    aria-label={`Tentar novamente: ${item.errorMessage}`}
+                    className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 px-2 text-center text-white"
+                  >
+                    <span role="alert" className="text-[11px] font-medium">
+                      {item.errorMessage}
+                    </span>
                     <span className="text-[11px] font-semibold underline">
                       Tentar novamente
                     </span>
-                  )}
-                </button>
+                  </button>
+                )
               )}
 
               {(item.status === "queued" || item.status === "uploading") && (

@@ -1,0 +1,94 @@
+/**
+ * Redimensiona fotografias muito grandes no próprio browser antes do
+ * envio (secção 10.3: "o browser valida quantidade, tamanho e tipo
+ * suportado antes do envio"). Fotos de câmara de telemóvel excedem
+ * facilmente o limite de 4 MB por pedido das Serverless Functions da
+ * Vercel (docs/decisions/0009) — sem isto, essas fotos eram sempre
+ * rejeitadas com "Ficheiro demasiado grande", sem alternativa para o
+ * convidado.
+ *
+ * Nunca é a única validação: o servidor continua a validar tipo,
+ * tamanho e assinatura binária de tudo o que recebe
+ * (`server/use-cases/uploads.ts`), como já acontecia antes. Esta é só
+ * uma otimização para o caso comum de sucesso.
+ *
+ * Falha sempre "aberta" para o ficheiro original: qualquer erro ou
+ * falta de suporte do browser (`createImageBitmap`/`canvas`) devolve o
+ * ficheiro tal como foi selecionado, deixando a validação de tamanho
+ * habitual do lado do chamador decidir.
+ */
+
+/** Lado máximo depois de otimizado — acima do preview (1600px, secção
+ * 13) para preservar mais detalhe no original guardado no Drive. */
+export const CLIENT_OPTIMIZE_MAX_EDGE = 2400;
+
+/** Só vale a pena otimizar ficheiros já razoavelmente grandes — evita
+ * reencodificar (e potencialmente piorar) uma foto já pequena. */
+export const CLIENT_OPTIMIZE_TRIGGER_BYTES = 2_000_000;
+
+export const CLIENT_OPTIMIZE_JPEG_QUALITY = 0.85;
+
+/**
+ * Calcula as dimensões-alvo preservando a proporção, ou `null` se a
+ * imagem já está dentro do limite (nada a fazer). Função pura,
+ * separada da parte que depende do browser, para poder ser testada
+ * sem `canvas`/`createImageBitmap`.
+ */
+export function computeTargetDimensions(
+  width: number,
+  height: number,
+  maxEdge: number = CLIENT_OPTIMIZE_MAX_EDGE,
+): { width: number; height: number } | null {
+  const largestEdge = Math.max(width, height);
+  if (largestEdge <= maxEdge) return null;
+
+  const scale = maxEdge / largestEdge;
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
+/**
+ * Devolve uma versão redimensionada de `file`, ou o próprio `file`
+ * inalterado quando não vale a pena (já pequeno, browser sem suporte,
+ * ou a versão redimensionada não ficou mais pequena).
+ */
+export async function optimizeImageFile(file: File): Promise<File> {
+  if (file.size <= CLIENT_OPTIMIZE_TRIGGER_BYTES) return file;
+  if (typeof createImageBitmap !== "function") return file;
+
+  let bitmap: ImageBitmap | undefined;
+  try {
+    // "from-image" respeita a orientação EXIF ao desenhar no canvas —
+    // sem isto, fotos em retrato de algumas câmaras ficariam de lado
+    // depois de otimizadas (a rotação por EXIF só existe nos
+    // metadados, o canvas desenha pixels em bruto).
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+
+    const target = computeTargetDimensions(bitmap.width, bitmap.height);
+    if (!target) return file;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = target.width;
+    canvas.height = target.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+
+    ctx.drawImage(bitmap, 0, 0, target.width, target.height);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, file.type, CLIENT_OPTIMIZE_JPEG_QUALITY),
+    );
+    if (!blob || blob.size >= file.size) return file;
+
+    return new File([blob], file.name, {
+      type: file.type,
+      lastModified: file.lastModified,
+    });
+  } catch {
+    return file;
+  } finally {
+    bitmap?.close();
+  }
+}
