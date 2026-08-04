@@ -28,15 +28,23 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
  * montar (pode ter dezenas de fotografias). */
 const VISIBLE_OFFSETS = [-1, 0, 1] as const;
 
+/** Acima disto, uma bolinha por fotografia deixaria de ser legível —
+ * um álbum de casamento facilmente tem uma ou duas centenas de
+ * fotografias. Nesses casos o contador "X / Y" na barra superior,
+ * sempre presente, continua a indicar a posição. */
+const MAX_PHOTOS_FOR_DOTS = 12;
+
 /**
- * Lightbox de ecrã inteiro (secção 10.2), com o "modo apresentação"
- * (secção 10.1/22) como uma variante do mesmo componente: avança
- * automaticamente enquanto `isPresenting` está ativo, respeitando
- * `prefers-reduced-motion` (secção 17). "Eliminar" só aparece para o
+ * Lightbox de ecrã inteiro (secção 10.2). "Eliminar" só aparece para o
  * dono do álbum (`isOwner`, resolvido no servidor em
  * `resolveAlbumSession` — nunca confiado apenas no cliente: o endpoint
  * `DELETE /api/photos/[photoId]` volta a validar a sessão de
- * administrador e a posse do álbum).
+ * administrador e a posse do álbum). O "modo apresentação" (secção
+ * 10.1/22) é uma variante do mesmo componente, ligada a partir de
+ * fora (`startInPresentationMode`, botão "Apresentação" na grelha) —
+ * avança automaticamente enquanto ativa, respeitando
+ * `prefers-reduced-motion` (secção 17); não há forma de a pausar sem
+ * fechar o diálogo (ADR 0025).
  *
  * Em vez de um fundo preto sólido a cobrir a página, o diálogo abre
  * sobre a própria galeria com um véu semitransparente desfocado
@@ -65,7 +73,6 @@ export function Lightbox({
   onDeleted: (photoId: string) => void;
 }) {
   const [index, setIndex] = useState(initialIndex);
-  const [isPresenting, setIsPresenting] = useState(startInPresentationMode);
   const deleteMutation = useMutation({
     mutationFn: (photoId: string) =>
       apiFetch(`/api/photos/${photoId}`, { method: "DELETE" }),
@@ -140,7 +147,7 @@ export function Lightbox({
 
   // Modo apresentação: avança automaticamente, exceto com movimento reduzido pedido.
   useEffect(() => {
-    if (!isPresenting) return;
+    if (!startInPresentationMode) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       return;
     }
@@ -151,7 +158,7 @@ export function Lightbox({
       );
     }, AUTO_ADVANCE_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [isPresenting, photos.length]);
+  }, [startInPresentationMode, photos.length]);
 
   function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
     touchStartX.current = event.touches[0]?.clientX ?? null;
@@ -178,19 +185,11 @@ export function Lightbox({
       role="dialog"
       aria-modal="true"
       aria-label="Visualização de fotografia"
-      className="fixed inset-0 z-50 flex flex-col bg-black/35 backdrop-blur-2xl"
+      className="fixed inset-0 z-50 flex flex-col bg-black/20 backdrop-blur-md"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="safe-top flex items-center justify-between gap-3 px-4 py-3">
-        <button
-          type="button"
-          onClick={() => setIsPresenting((current) => !current)}
-          className="rounded-full border border-white/30 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/10"
-        >
-          {isPresenting ? "Pausar apresentação" : "Apresentação"}
-        </button>
-
+      <div className="safe-top flex items-center justify-between gap-3 px-4 pt-6 pb-3 sm:pt-8">
         <p className="text-sm text-white/70" aria-live="polite">
           {index + 1} / {photos.length}
         </p>
@@ -265,7 +264,7 @@ export function Lightbox({
         )}
       </div>
 
-      <div className="safe-bottom flex flex-col items-center gap-2 px-4 py-4">
+      <div className="safe-bottom flex flex-col items-center gap-3 px-4 pt-2 pb-4">
         <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-white/70">
           <span>
             Enviada em {new Date(photo.uploadedAt).toLocaleDateString("pt-PT")}
@@ -305,6 +304,19 @@ export function Lightbox({
           <p role="alert" className="text-danger text-xs">
             Não foi possível eliminar a fotografia. Tente novamente.
           </p>
+        )}
+
+        {photos.length <= MAX_PHOTOS_FOR_DOTS && (
+          <div role="presentation" className="flex items-center justify-center gap-1.5">
+            {photos.map((dotPhoto, dotIndex) => (
+              <span
+                key={dotPhoto.id}
+                className={`h-1.5 rounded-full transition-all ${
+                  dotIndex === index ? "w-4 bg-white" : "w-1.5 bg-white/40"
+                }`}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>

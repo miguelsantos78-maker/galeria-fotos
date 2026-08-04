@@ -7,6 +7,7 @@ import {
   fireEvent,
   cleanup,
   waitFor,
+  act,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -199,5 +200,49 @@ describe("Lightbox", () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(onDeleted).not.toHaveBeenCalled();
+  });
+
+  it("não mostra um botão para ligar/pausar a apresentação", () => {
+    renderLightbox();
+
+    expect(
+      screen.queryByRole("button", { name: "Apresentação" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Pausar apresentação" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("avança automaticamente quando startInPresentationMode é verdadeiro", () => {
+    vi.useFakeTimers();
+    try {
+      renderLightbox({ startInPresentationMode: true });
+      expect(screen.getByText("1 / 3")).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(screen.getByText("2 / 3")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("mostra um marcador por fotografia quando há poucas fotografias", () => {
+    renderLightbox();
+
+    const dots = document.querySelectorAll('[role="presentation"] > span');
+    expect(dots).toHaveLength(3);
+  });
+
+  it("esconde os marcadores quando há muitas fotografias", () => {
+    const manyPhotos = Array.from({ length: 13 }, (_, i) =>
+      makePhoto({ id: `photo-${i + 1}` }),
+    );
+    renderLightbox({ photos: manyPhotos });
+
+    expect(document.querySelector('[role="presentation"]')).toBeNull();
+    // O contador continua a indicar a posição mesmo sem marcadores.
+    expect(screen.getByText("1 / 13")).toBeInTheDocument();
   });
 });
