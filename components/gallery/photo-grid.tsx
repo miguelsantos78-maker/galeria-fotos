@@ -151,15 +151,17 @@ export function PhotoGrid({
           </div>
 
           {/* Grelha densa e sem espaçamento visual entre miniaturas — o
-              padrão de um álbum partilhado (secção 1/10.1): tudo
-              quadrado, tudo até à borda do ecrã em telemóvel. */}
+              padrão de um álbum partilhado (secção 1/10.1): tudo até à
+              borda do ecrã em telemóvel. Miniaturas mais altas do que
+              largas (4:5), não quadradas, para dar mais destaque a
+              cada fotografia. */}
           <div className="grid grid-cols-3 gap-0.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
             {photos.map((photo) => (
               <button
                 key={photo.id}
                 type="button"
                 onClick={() => updatePhotoParam(photo.id)}
-                className="bg-surface-muted focus-visible:ring-brand-600 relative block aspect-square w-full overflow-hidden focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset"
+                className="bg-surface-muted focus-visible:ring-brand-600 relative block aspect-[4/5] w-full overflow-hidden focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset"
               >
                 {photo.thumbnailUrl && (
                   // eslint-disable-next-line @next/next/no-img-element -- URL assinado de um domínio de Storage dinâmico (por instalação); ver docs/decisions/0005.
