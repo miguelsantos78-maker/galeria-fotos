@@ -7,7 +7,9 @@ describe("buildSecurityHeaders", () => {
     const csp = headers["Content-Security-Policy"];
 
     expect(csp).toContain("default-src 'self'");
-    expect(csp).toContain("img-src 'self' data: https://my-project.supabase.co");
+    expect(csp).toContain(
+      "img-src 'self' data: blob: https://my-project.supabase.co",
+    );
     expect(csp).toContain(
       "connect-src 'self' https://my-project.supabase.co wss://my-project.supabase.co",
     );

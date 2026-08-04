@@ -19,6 +19,15 @@ const MAX_FILES = 50;
 const MAX_CONCURRENT_UPLOADS = 3;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+/**
+ * Substitui a pré-visualização por um ícone genérico quando o
+ * `blob:` local não consegue carregar (ex.: um bloqueio de CSP
+ * inesperado, ou um ficheiro que o browser não sabe decodificar) — nunca
+ * o ícone de imagem partida do browser.
+ */
+const FALLBACK_PREVIEW =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' fill='%23e5e0da'/%3E%3Cpath d='M8 34l9-11 7 8 5-6 11 9v2H8z' fill='%23b8ada0'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23b8ada0'/%3E%3C/svg%3E";
+
 type QueueStatus = "queued" | "uploading" | "done" | "error" | "canceled";
 
 interface QueueItem {
@@ -273,6 +282,10 @@ export function UploadQueue({ albumId }: { albumId: string }) {
               <img
                 src={item.previewUrl}
                 alt={item.file.name}
+                onError={(event) => {
+                  event.currentTarget.onerror = null;
+                  event.currentTarget.src = FALLBACK_PREVIEW;
+                }}
                 className="absolute inset-0 h-full w-full object-cover"
               />
 

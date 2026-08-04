@@ -31,7 +31,11 @@ export function buildSecurityHeaders(supabaseUrl: string): SecurityHeaders {
     `default-src 'self'`,
     `script-src 'self' 'unsafe-inline'`,
     `style-src 'self' 'unsafe-inline'`,
-    `img-src 'self' data: https://${supabaseHost}`,
+    // blob: é necessário para a pré-visualização local do envio
+    // (`URL.createObjectURL(file)` em components/upload/upload-queue.tsx)
+    // — sem esta origem, o CSP bloqueia essas imagens e a miniatura
+    // aparece partida antes mesmo de o envio começar.
+    `img-src 'self' data: blob: https://${supabaseHost}`,
     `font-src 'self'`,
     `connect-src 'self' https://${supabaseHost} wss://${supabaseHost}`,
     `frame-ancestors 'none'`,
