@@ -2,6 +2,7 @@ import "server-only";
 import type { AlbumsRepository } from "@/server/repositories/albums-repository";
 import type { ShareLinksRepository } from "@/server/repositories/share-links-repository";
 import type { AlbumSessionsRepository } from "@/server/repositories/album-sessions-repository";
+import type { PhotosRepository } from "@/server/repositories/photos-repository";
 import type { ResolveAlbumInput } from "@/lib/validation/share-link";
 import { hashShareToken } from "@/lib/security/tokens";
 import { verifyPin } from "@/lib/security/pin";
@@ -26,6 +27,14 @@ export interface PublicAlbumView {
   downloadEnabled: boolean;
   eventStartAt: string | null;
   eventEndAt: string | null;
+  /**
+   * URL assinado de curta duração (secção 5.4) da fotografia de capa
+   * (`albums.cover_photo_id`, já definida pelo administrador em
+   * "Definir capa" — secção 10.4), ou `null` quando o álbum não tem
+   * capa definida, a fotografia foi eliminada, ou ainda não tem
+   * preview gerado.
+   */
+  coverPhotoUrl: string | null;
 }
 
 export interface ResolveAlbumResult {
@@ -47,6 +56,8 @@ interface ResolveDeps {
   albums: AlbumsRepository;
   shareLinks: ShareLinksRepository;
   sessions: AlbumSessionsRepository;
+  photos: Pick<PhotosRepository, "findById">;
+  createSignedUrls: (paths: string[]) => Promise<Map<string, string>>;
 }
 
 /**
@@ -102,6 +113,7 @@ export async function resolveAlbumSession(
     : link.permissions.filter((permission) => permission !== "upload");
 
   const isOwner = !ctx.isAnonymous && ctx.userId === album.owner_id;
+  const coverPhotoUrl = await resolveCoverPhotoUrl(album, deps);
 
   const sessionExpiresAt = new Date(
     Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000,
@@ -120,7 +132,11 @@ export async function resolveAlbumSession(
     expires_at: expiresAt,
   });
 
-  return { album: toPublicAlbumView(album), permissions, isOwner };
+  return {
+    album: toPublicAlbumView(album, coverPhotoUrl),
+    permissions,
+    isOwner,
+  };
 }
 
 function isLinkCurrentlyValid(link: {
@@ -132,7 +148,23 @@ function isLinkCurrentlyValid(link: {
   return true;
 }
 
-function toPublicAlbumView(album: AlbumRow): PublicAlbumView {
+async function resolveCoverPhotoUrl(
+  album: AlbumRow,
+  deps: Pick<ResolveDeps, "photos" | "createSignedUrls">,
+): Promise<string | null> {
+  if (!album.cover_photo_id) return null;
+
+  const photo = await deps.photos.findById(album.cover_photo_id);
+  if (!photo || photo.deleted_at || !photo.preview_path) return null;
+
+  const signedUrls = await deps.createSignedUrls([photo.preview_path]);
+  return signedUrls.get(photo.preview_path) ?? null;
+}
+
+function toPublicAlbumView(
+  album: AlbumRow,
+  coverPhotoUrl: string | null,
+): PublicAlbumView {
   return {
     id: album.id,
     title: album.title,
@@ -142,5 +174,6 @@ function toPublicAlbumView(album: AlbumRow): PublicAlbumView {
     downloadEnabled: album.download_enabled,
     eventStartAt: album.event_start_at,
     eventEndAt: album.event_end_at,
+    coverPhotoUrl,
   };
 }

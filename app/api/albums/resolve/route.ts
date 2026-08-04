@@ -3,6 +3,8 @@ import { createSupabaseAdminClient } from "@/lib/db/supabase-admin";
 import { createAlbumsRepository } from "@/server/repositories/albums-repository";
 import { createShareLinksRepository } from "@/server/repositories/share-links-repository";
 import { createAlbumSessionsRepository } from "@/server/repositories/album-sessions-repository";
+import { createPhotosRepository } from "@/server/repositories/photos-repository";
+import { createSignedPreviewUrls } from "@/lib/media/preview-url";
 import { resolveAlbumSession } from "@/server/use-cases/resolve-album";
 import { resolveAlbumSchema } from "@/lib/validation/share-link";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
@@ -65,6 +67,9 @@ export async function POST(request: Request) {
         albums: createAlbumsRepository(adminClient),
         shareLinks: createShareLinksRepository(adminClient),
         sessions: createAlbumSessionsRepository(adminClient),
+        photos: createPhotosRepository(adminClient),
+        createSignedUrls: (paths) =>
+          createSignedPreviewUrls(adminClient, paths),
       },
     );
 

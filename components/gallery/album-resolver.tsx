@@ -57,24 +57,55 @@ export function AlbumResolver({ token }: { token: string }) {
   return (
     <main className="flex flex-1 flex-col">
       <header className="safe-top px-4 pt-6 sm:px-6 sm:pt-8">
-        <div className="rounded-card border-border bg-surface mx-auto max-w-2xl border p-8 text-center shadow-md sm:p-10">
-          <div
-            aria-hidden="true"
-            className="mb-5 flex items-center justify-center gap-3"
-          >
-            <span className="bg-brand-600/40 h-px w-10 sm:w-14" />
-            <span className="bg-brand-600 h-1.5 w-1.5 rounded-full" />
-            <span className="bg-brand-600/40 h-px w-10 sm:w-14" />
+        {album.coverPhotoUrl ? (
+          <div className="rounded-card border-border mx-auto max-w-2xl overflow-hidden border shadow-md">
+            <div className="relative h-72 sm:h-80">
+              {/* eslint-disable-next-line @next/next/no-img-element -- URL assinado do Supabase Storage, gerado por pedido (secção 5.4); decorativa, o título ao lado já descreve o álbum. */}
+              <img
+                src={album.coverPhotoUrl}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              <div className="rounded-card border-border/40 bg-surface/60 absolute inset-x-3 bottom-3 border p-5 text-center shadow-lg backdrop-blur-md sm:p-6">
+                <div
+                  aria-hidden="true"
+                  className="mb-4 flex items-center justify-center gap-3"
+                >
+                  <span className="bg-brand-600/40 h-px w-8 sm:w-10" />
+                  <span className="bg-brand-600 h-1.5 w-1.5 rounded-full" />
+                  <span className="bg-brand-600/40 h-px w-8 sm:w-10" />
+                </div>
+                <h1 className="text-foreground font-serif text-2xl font-semibold text-balance sm:text-3xl">
+                  {album.title}
+                </h1>
+                {album.description && (
+                  <p className="text-foreground/80 mx-auto mt-2 max-w-md text-sm text-balance">
+                    {album.description}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
-          <h1 className="text-foreground font-serif text-3xl font-semibold text-balance sm:text-4xl">
-            {album.title}
-          </h1>
-          {album.description && (
-            <p className="text-foreground/70 mx-auto mt-3 max-w-md text-sm text-balance">
-              {album.description}
-            </p>
-          )}
-        </div>
+        ) : (
+          <div className="rounded-card border-border bg-surface mx-auto max-w-2xl border p-8 text-center shadow-md sm:p-10">
+            <div
+              aria-hidden="true"
+              className="mb-5 flex items-center justify-center gap-3"
+            >
+              <span className="bg-brand-600/40 h-px w-10 sm:w-14" />
+              <span className="bg-brand-600 h-1.5 w-1.5 rounded-full" />
+              <span className="bg-brand-600/40 h-px w-10 sm:w-14" />
+            </div>
+            <h1 className="text-foreground font-serif text-3xl font-semibold text-balance sm:text-4xl">
+              {album.title}
+            </h1>
+            {album.description && (
+              <p className="text-foreground/70 mx-auto mt-3 max-w-md text-sm text-balance">
+                {album.description}
+              </p>
+            )}
+          </div>
+        )}
       </header>
 
       <div

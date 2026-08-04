@@ -22,6 +22,7 @@ const RESOLVED_ALBUM = {
     downloadEnabled: true,
     eventStartAt: null,
     eventEndAt: null,
+    coverPhotoUrl: null,
   },
   permissions: ["view", "upload"],
   isOwner: false,
@@ -133,6 +134,41 @@ test("a página do álbum resolvido não tem violações de acessibilidade séri
   await expect(
     page.getByRole("heading", { name: "Casamento da Ana e do João" }),
   ).toBeVisible();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+
+  expect(results.violations).toEqual([]);
+});
+
+test("mostra a fotografia de capa quando o álbum tem uma definida", async ({
+  page,
+}) => {
+  const coverUrl = "https://signed.example.com/cover.webp";
+  await page.route(coverUrl, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    });
+  });
+  await mockResolve(page, {
+    album: { ...RESOLVED_ALBUM.album, coverPhotoUrl: coverUrl },
+  });
+  await mockEmptyPhotos(page);
+
+  await page.goto("/a/token-de-teste");
+
+  await expect(
+    page.getByRole("heading", { name: "Casamento da Ana e do João" }),
+  ).toBeVisible();
+  const coverImage = page.locator(`img[src="${coverUrl}"]`);
+  await expect(coverImage).toBeVisible();
+  await expect(coverImage).toHaveAttribute("alt", "");
 
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa"])

@@ -6,8 +6,10 @@ import { resolveAlbumSession } from "@/server/use-cases/resolve-album";
 import {
   createFakeAlbumSessionsRepository,
   createFakeAlbumsRepository,
+  createFakePhotosRepository,
   createFakeShareLinksRepository,
   makeAlbumRow,
+  makePhotoRow,
 } from "../fakes/repositories";
 import { validServerEnv } from "../fakes/env";
 
@@ -24,6 +26,12 @@ afterEach(() => {
   resetEnvCacheForTests();
 });
 
+function fakeSignedUrls(paths: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  for (const path of paths) map.set(path, `https://signed.example/${path}`);
+  return Promise.resolve(map);
+}
+
 function setup(
   overrides: {
     album?: Partial<ReturnType<typeof makeAlbumRow>>;
@@ -33,6 +41,7 @@ function setup(
       expires_at: string | null;
       permissions: ("view" | "upload" | "moderate")[];
     }>;
+    photos?: ReturnType<typeof makePhotoRow>[];
   } = {},
 ) {
   const album = makeAlbumRow({ status: "published", ...overrides.album });
@@ -57,18 +66,28 @@ function setup(
     },
   ]);
   const sessions = createFakeAlbumSessionsRepository();
+  const photos = createFakePhotosRepository(overrides.photos ?? []);
+  const createSignedUrls = fakeSignedUrls;
 
-  return { album, token, albums, shareLinks, sessions };
+  return {
+    album,
+    token,
+    albums,
+    shareLinks,
+    sessions,
+    photos,
+    createSignedUrls,
+  };
 }
 
 describe("resolveAlbumSession", () => {
   it("cria uma album_session para um token válido", async () => {
-    const { token, albums, shareLinks, sessions, album } = setup();
+    const { token, albums, shareLinks, sessions, album, photos, createSignedUrls } = setup();
 
     const result = await resolveAlbumSession(
       { token },
       { userId: "guest-1", isAnonymous: true },
-      { albums, shareLinks, sessions },
+      { albums, shareLinks, sessions, photos, createSignedUrls },
     );
 
     expect(result.album.id).toBe(album.id);
@@ -78,19 +97,19 @@ describe("resolveAlbumSession", () => {
   });
 
   it("rejeita um token inexistente com ALBUM_LINK_INVALID", async () => {
-    const { albums, shareLinks, sessions } = setup();
+    const { albums, shareLinks, sessions, photos, createSignedUrls } = setup();
 
     await expect(
       resolveAlbumSession(
         { token: "token-errado" },
         { userId: "guest-1", isAnonymous: true },
-        { albums, shareLinks, sessions },
+        { albums, shareLinks, sessions, photos, createSignedUrls },
       ),
     ).rejects.toMatchObject({ code: "ALBUM_LINK_INVALID" });
   });
 
   it("rejeita um link revogado com o mesmo código genérico", async () => {
-    const { token, albums, shareLinks, sessions } = setup({
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
       link: { revoked_at: new Date().toISOString() },
     });
 
@@ -98,13 +117,13 @@ describe("resolveAlbumSession", () => {
       resolveAlbumSession(
         { token },
         { userId: "guest-1", isAnonymous: true },
-        { albums, shareLinks, sessions },
+        { albums, shareLinks, sessions, photos, createSignedUrls },
       ),
     ).rejects.toMatchObject({ code: "ALBUM_LINK_INVALID" });
   });
 
   it("rejeita um link expirado", async () => {
-    const { token, albums, shareLinks, sessions } = setup({
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
       link: { expires_at: new Date(Date.now() - 1000).toISOString() },
     });
 
@@ -112,13 +131,13 @@ describe("resolveAlbumSession", () => {
       resolveAlbumSession(
         { token },
         { userId: "guest-1", isAnonymous: true },
-        { albums, shareLinks, sessions },
+        { albums, shareLinks, sessions, photos, createSignedUrls },
       ),
     ).rejects.toMatchObject({ code: "ALBUM_LINK_INVALID" });
   });
 
   it("rejeita um álbum que não está publicado", async () => {
-    const { token, albums, shareLinks, sessions } = setup({
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
       album: { status: "draft" },
     });
 
@@ -126,13 +145,13 @@ describe("resolveAlbumSession", () => {
       resolveAlbumSession(
         { token },
         { userId: "guest-1", isAnonymous: true },
-        { albums, shareLinks, sessions },
+        { albums, shareLinks, sessions, photos, createSignedUrls },
       ),
     ).rejects.toMatchObject({ code: "ALBUM_LINK_INVALID" });
   });
 
   it("exige PIN quando o link tem um", async () => {
-    const { token, albums, shareLinks, sessions } = setup({
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
       link: { pin_hash: hashPin("1234") },
     });
 
@@ -140,13 +159,13 @@ describe("resolveAlbumSession", () => {
       resolveAlbumSession(
         { token },
         { userId: "guest-1", isAnonymous: true },
-        { albums, shareLinks, sessions },
+        { albums, shareLinks, sessions, photos, createSignedUrls },
       ),
     ).rejects.toMatchObject({ code: "ALBUM_PIN_REQUIRED" });
   });
 
   it("rejeita um PIN errado", async () => {
-    const { token, albums, shareLinks, sessions } = setup({
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
       link: { pin_hash: hashPin("1234") },
     });
 
@@ -154,27 +173,27 @@ describe("resolveAlbumSession", () => {
       resolveAlbumSession(
         { token, pin: "0000" },
         { userId: "guest-1", isAnonymous: true },
-        { albums, shareLinks, sessions },
+        { albums, shareLinks, sessions, photos, createSignedUrls },
       ),
     ).rejects.toMatchObject({ code: "ALBUM_PIN_INVALID" });
   });
 
   it("aceita o PIN correto", async () => {
-    const { token, albums, shareLinks, sessions } = setup({
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
       link: { pin_hash: hashPin("1234") },
     });
 
     const result = await resolveAlbumSession(
       { token, pin: "1234" },
       { userId: "guest-1", isAnonymous: true },
-      { albums, shareLinks, sessions },
+      { albums, shareLinks, sessions, photos, createSignedUrls },
     );
 
     expect(result.album).toBeDefined();
   });
 
   it("remove a permissão 'upload' quando o álbum tem upload desligado", async () => {
-    const { token, albums, shareLinks, sessions } = setup({
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
       album: { upload_enabled: false },
       link: { permissions: ["view", "upload"] },
     });
@@ -182,51 +201,123 @@ describe("resolveAlbumSession", () => {
     const result = await resolveAlbumSession(
       { token },
       { userId: "guest-1", isAnonymous: true },
-      { albums, shareLinks, sessions },
+      { albums, shareLinks, sessions, photos, createSignedUrls },
     );
 
     expect(result.permissions).toEqual(["view"]);
   });
 
   it("isOwner é true para o dono do álbum autenticado (não anónimo)", async () => {
-    const { token, albums, shareLinks, sessions, album } = setup({
+    const { token, albums, shareLinks, sessions, album, photos, createSignedUrls } = setup({
       album: { owner_id: "owner-1" },
     });
 
     const result = await resolveAlbumSession(
       { token },
       { userId: album.owner_id, isAnonymous: false },
-      { albums, shareLinks, sessions },
+      { albums, shareLinks, sessions, photos, createSignedUrls },
     );
 
     expect(result.isOwner).toBe(true);
   });
 
   it("isOwner é false para um convidado anónimo, mesmo com o mesmo user_id do dono", async () => {
-    const { token, albums, shareLinks, sessions, album } = setup({
+    const { token, albums, shareLinks, sessions, album, photos, createSignedUrls } = setup({
       album: { owner_id: "owner-1" },
     });
 
     const result = await resolveAlbumSession(
       { token },
       { userId: album.owner_id, isAnonymous: true },
-      { albums, shareLinks, sessions },
+      { albums, shareLinks, sessions, photos, createSignedUrls },
     );
 
     expect(result.isOwner).toBe(false);
   });
 
   it("isOwner é false para um utilizador autenticado que não é o dono", async () => {
-    const { token, albums, shareLinks, sessions } = setup({
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
       album: { owner_id: "owner-1" },
     });
 
     const result = await resolveAlbumSession(
       { token },
       { userId: "outro-utilizador", isAnonymous: false },
-      { albums, shareLinks, sessions },
+      { albums, shareLinks, sessions, photos, createSignedUrls },
     );
 
     expect(result.isOwner).toBe(false);
+  });
+
+  it("coverPhotoUrl é null quando o álbum não tem capa definida", async () => {
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup();
+
+    const result = await resolveAlbumSession(
+      { token },
+      { userId: "guest-1", isAnonymous: true },
+      { albums, shareLinks, sessions, photos, createSignedUrls },
+    );
+
+    expect(result.album.coverPhotoUrl).toBeNull();
+  });
+
+  it("coverPhotoUrl é o URL assinado do preview da fotografia de capa", async () => {
+    const coverPhoto = makePhotoRow({
+      preview_path: "albums/album-1/cover/preview.webp",
+    });
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup({
+        album: { cover_photo_id: coverPhoto.id },
+        photos: [coverPhoto],
+      });
+
+    const result = await resolveAlbumSession(
+      { token },
+      { userId: "guest-1", isAnonymous: true },
+      { albums, shareLinks, sessions, photos, createSignedUrls },
+    );
+
+    expect(result.album.coverPhotoUrl).toBe(
+      "https://signed.example/albums/album-1/cover/preview.webp",
+    );
+  });
+
+  it("coverPhotoUrl é null quando a fotografia de capa foi eliminada", async () => {
+    const coverPhoto = makePhotoRow({
+      preview_path: "albums/album-1/cover/preview.webp",
+      status: "deleted",
+      deleted_at: new Date().toISOString(),
+    });
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup({
+        album: { cover_photo_id: coverPhoto.id },
+        photos: [coverPhoto],
+      });
+
+    const result = await resolveAlbumSession(
+      { token },
+      { userId: "guest-1", isAnonymous: true },
+      { albums, shareLinks, sessions, photos, createSignedUrls },
+    );
+
+    expect(result.album.coverPhotoUrl).toBeNull();
+  });
+
+  it("coverPhotoUrl é null quando a fotografia de capa ainda não tem preview", async () => {
+    const coverPhoto = makePhotoRow({ preview_path: null });
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup({
+        album: { cover_photo_id: coverPhoto.id },
+        photos: [coverPhoto],
+      });
+
+    const result = await resolveAlbumSession(
+      { token },
+      { userId: "guest-1", isAnonymous: true },
+      { albums, shareLinks, sessions, photos, createSignedUrls },
+    );
+
+    expect(result.album.coverPhotoUrl).toBeNull();
   });
 });
