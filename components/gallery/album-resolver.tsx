@@ -56,59 +56,38 @@ export function AlbumResolver({ token }: { token: string }) {
 
   return (
     <main className="flex flex-1 flex-col">
-      <header className="safe-top from-brand-600/15 border-border border-b bg-gradient-to-b to-transparent px-6 pt-20 pb-14 text-center sm:pt-24 sm:pb-16">
-        <div
-          aria-hidden="true"
-          className="mb-5 flex items-center justify-center gap-3"
-        >
-          <span className="bg-brand-600/40 h-px w-10 sm:w-14" />
-          <span className="bg-brand-600 h-1.5 w-1.5 rounded-full" />
-          <span className="bg-brand-600/40 h-px w-10 sm:w-14" />
+      <header className="safe-top px-4 pt-6 sm:px-6 sm:pt-8">
+        <div className="rounded-card border-border bg-surface mx-auto max-w-2xl border p-8 text-center shadow-md sm:p-10">
+          <div
+            aria-hidden="true"
+            className="mb-5 flex items-center justify-center gap-3"
+          >
+            <span className="bg-brand-600/40 h-px w-10 sm:w-14" />
+            <span className="bg-brand-600 h-1.5 w-1.5 rounded-full" />
+            <span className="bg-brand-600/40 h-px w-10 sm:w-14" />
+          </div>
+          <h1 className="text-foreground font-serif text-3xl font-semibold text-balance sm:text-4xl">
+            {album.title}
+          </h1>
+          {album.description && (
+            <p className="text-foreground/70 mx-auto mt-3 max-w-md text-sm text-balance">
+              {album.description}
+            </p>
+          )}
         </div>
-        <h1 className="text-foreground font-serif text-3xl font-semibold text-balance sm:text-4xl">
-          {album.title}
-        </h1>
-        {album.description && (
-          <p className="text-foreground/70 mx-auto mt-3 max-w-md text-sm text-balance">
-            {album.description}
-          </p>
-        )}
       </header>
 
-      {canUpload && (
-        <div className="rounded-card border-brand-600/25 bg-brand-600/5 mx-4 my-5 flex flex-col gap-4 border p-5 sm:mx-6 sm:p-6">
-          <div className="flex items-center gap-3">
-            <span className="bg-brand-600 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white">
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="h-5 w-5"
-              >
-                <path d="M10 4a1 1 0 0 1 1 1v4h4a1 1 0 1 1 0 2h-4v4a1 1 0 1 1-2 0v-4H5a1 1 0 1 1 0-2h4V5a1 1 0 0 1 1-1Z" />
-              </svg>
-            </span>
-            <div>
-              <h2 className="text-foreground font-serif text-lg font-semibold">
-                Adicionar fotografias
-              </h2>
-              <p className="text-foreground/70 text-sm">
-                Partilhe as suas fotos deste dia com todos os convidados.
-              </p>
-            </div>
-          </div>
-
-          <UploadQueue albumId={album.id} />
-        </div>
-      )}
-
-      <div className="flex flex-1 flex-col">
+      <div
+        className={`flex flex-1 flex-col ${canUpload ? "pb-36 sm:pb-40" : ""}`}
+      >
         <PhotoGrid
           albumId={album.id}
           downloadEnabled={album.downloadEnabled}
           isOwner={isOwner}
         />
       </div>
+
+      {canUpload && <UploadQueue albumId={album.id} />}
     </main>
   );
 }

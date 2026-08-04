@@ -78,9 +78,6 @@ test("mostra a área de envio de fotografias quando a sessão tem permissão de 
   await page.goto("/a/token-de-teste");
 
   await expect(
-    page.getByRole("heading", { name: "Adicionar fotografias" }),
-  ).toBeVisible();
-  await expect(
     page.getByText("Escolher ou tirar fotografias"),
   ).toBeVisible();
 });
@@ -94,7 +91,7 @@ test("esconde a área de envio de fotografias sem permissão de upload", async (
   await page.goto("/a/token-de-teste");
 
   await expect(
-    page.getByRole("heading", { name: "Adicionar fotografias" }),
+    page.getByText("Escolher ou tirar fotografias"),
   ).toHaveCount(0);
 });
 

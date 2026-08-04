@@ -80,7 +80,7 @@ afterEach(() => {
 });
 
 describe("UploadQueue", () => {
-  it("mostra 'Tentar novamente' para um erro genérico de envio", async () => {
+  it("mostra um botão de tentar novamente para um erro genérico de envio", async () => {
     renderUploadQueue();
     await selectFile();
 
@@ -90,12 +90,17 @@ describe("UploadQueue", () => {
       error: { code: "UPLOAD_DRIVE_FAILED", message: "Falha no envio." },
     });
 
-    expect(await screen.findByText("Falha no envio.")).toBeInTheDocument();
-    expect(screen.getByText("Tentar novamente")).toBeInTheDocument();
-    expect(screen.queryByText("Já enviada para este álbum")).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", {
+        name: "Tentar novamente: Falha no envio.",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Já enviada para este álbum/ }),
+    ).not.toBeInTheDocument();
   });
 
-  it("mostra uma mensagem enquadrada com 'Remover' para uma fotografia duplicada", async () => {
+  it("mostra um botão enquadrado (tom de aviso) para uma fotografia duplicada", async () => {
     renderUploadQueue();
     await selectFile();
 
@@ -108,14 +113,16 @@ describe("UploadQueue", () => {
       },
     });
 
+    const duplicateButton = await screen.findByRole("button", {
+      name: "Já enviada para este álbum. Tocar para remover da lista.",
+    });
+    expect(duplicateButton).toBeInTheDocument();
     expect(
-      await screen.findByText("Já enviada para este álbum"),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("status")).toBeInTheDocument();
-    expect(screen.queryByText("Tentar novamente")).not.toBeInTheDocument();
+      screen.queryByRole("button", { name: /^Tentar novamente/ }),
+    ).not.toBeInTheDocument();
   });
 
-  it("remove o item da lista ao clicar em 'Remover' num duplicado", async () => {
+  it("remove o item da lista ao tocar no botão de duplicado", async () => {
     const user = userEvent.setup();
     renderUploadQueue();
     await selectFile("duplicada.jpg");
@@ -125,9 +132,11 @@ describe("UploadQueue", () => {
       data: null,
       error: { code: "PHOTO_DUPLICATE", message: "Já enviada." },
     });
-    await screen.findByText("Já enviada para este álbum");
+    const duplicateButton = await screen.findByRole("button", {
+      name: "Já enviada para este álbum. Tocar para remover da lista.",
+    });
 
-    await user.click(screen.getByRole("button", { name: "Remover" }));
+    await user.click(duplicateButton);
 
     expect(screen.queryByAltText("duplicada.jpg")).not.toBeInTheDocument();
   });

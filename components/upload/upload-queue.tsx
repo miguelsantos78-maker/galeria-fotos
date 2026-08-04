@@ -303,23 +303,15 @@ export function UploadQueue({ albumId }: { albumId: string }) {
   const doneCount = items.filter((item) => item.status === "done").length;
 
   return (
-    <div className="flex flex-col gap-4">
-      <label className="bg-brand-600 hover:bg-brand-700 flex w-full cursor-pointer items-center justify-center rounded-full px-5 py-3 text-center text-sm font-medium text-white transition-colors">
-        Escolher ou tirar fotografias
-        <input
-          type="file"
-          accept={ACCEPTED_TYPES.join(",")}
-          multiple
-          onChange={(event) => {
-            handleFilesSelected(event.target.files);
-            event.target.value = "";
-          }}
-          className="sr-only"
-        />
-      </label>
-
+    // Botão flutuante fixo em baixo, em vez de um campo inline no topo
+    // da página — a fila de miniaturas (quando há envios em curso)
+    // aparece por cima do botão, dentro do mesmo grupo fixo.
+    <div className="safe-bottom fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-4">
       {selectionError && (
-        <p role="alert" className="text-danger text-sm">
+        <p
+          role="alert"
+          className="bg-danger rounded-full px-4 py-1.5 text-center text-xs font-medium text-white shadow-lg"
+        >
           {selectionError}
         </p>
       )}
@@ -330,11 +322,11 @@ export function UploadQueue({ albumId }: { albumId: string }) {
       </div>
 
       {items.length > 0 && (
-        <ul className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+        <ul className="border-border bg-surface/95 rounded-card flex max-w-full gap-1.5 overflow-x-auto border p-1.5 shadow-lg backdrop-blur">
           {items.map((item) => (
             <li
               key={item.id}
-              className="bg-surface-muted rounded-card relative aspect-square overflow-hidden"
+              className="bg-surface-muted rounded-md relative h-16 w-16 shrink-0 overflow-hidden"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- pré-visualização local via URL.createObjectURL, nunca um URL remoto. */}
               <img
@@ -348,32 +340,27 @@ export function UploadQueue({ albumId }: { albumId: string }) {
               />
 
               {item.status === "uploading" && (
-                <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-black/60 px-2 py-1.5">
+                <div
+                  className="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-1"
+                  aria-label={`A enviar, ${item.progress}%`}
+                >
                   <div className="h-1 overflow-hidden rounded-full bg-white/30">
                     <div
                       className="bg-brand-400 h-full transition-all"
                       style={{ width: `${item.progress}%` }}
                     />
                   </div>
-                  <span className="text-[11px] font-medium text-white">
-                    {item.progress}%
-                  </span>
                 </div>
               )}
 
-              {item.status === "optimizing" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                  <span className="rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-medium text-white">
-                    A otimizar…
-                  </span>
-                </div>
-              )}
-
-              {item.status === "queued" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                  <span className="rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-medium text-white">
-                    Na fila…
-                  </span>
+              {(item.status === "optimizing" || item.status === "queued") && (
+                <div
+                  className="absolute inset-0 flex items-center justify-center bg-black/30"
+                  aria-label={
+                    item.status === "optimizing" ? "A otimizar" : "Na fila"
+                  }
+                >
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
                 </div>
               )}
 
@@ -383,7 +370,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
                     aria-hidden="true"
                     viewBox="0 0 20 20"
                     fill="currentColor"
-                    className="h-4 w-4"
+                    className="h-3.5 w-3.5"
                   >
                     <path
                       fillRule="evenodd"
@@ -396,23 +383,28 @@ export function UploadQueue({ albumId }: { albumId: string }) {
 
               {item.status === "canceled" && (
                 <div
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 px-2 text-center text-white"
+                  className="absolute inset-0 bg-black/60"
                   aria-label="Envio cancelado"
-                >
-                  <span className="text-[11px] font-medium">Cancelada</span>
-                </div>
+                />
               )}
 
               {/* Duplicado (secção 13): não é um erro no sentido habitual
                   — a fotografia já está no álbum — por isso usa um tom
                   de aviso (âmbar), enquadrado com o resto da interface,
-                  em vez do vermelho/preto genérico de falha. */}
+                  em vez do vermelho/preto genérico de falha. Ícone só
+                  (sem texto): a miniatura de 64px não tem espaço para
+                  frase + botão, por isso a ação (remover) fica no
+                  próprio toque no ícone, com o texto completo acessível
+                  via aria-label/title. */}
               {item.status === "error" && item.errorCode === "PHOTO_DUPLICATE" ? (
-                <div
-                  role="status"
-                  className="bg-surface/95 border-warning/40 absolute inset-0 flex flex-col items-center justify-center gap-1.5 border px-2 text-center"
+                <button
+                  type="button"
+                  onClick={() => handleDismiss(item.id)}
+                  aria-label="Já enviada para este álbum. Tocar para remover da lista."
+                  title="Já enviada para este álbum — tocar para remover"
+                  className="bg-surface/80 border-warning/50 absolute inset-0 flex items-center justify-center border"
                 >
-                  <span className="bg-warning/15 text-warning flex h-7 w-7 items-center justify-center rounded-full">
+                  <span className="bg-warning/20 text-warning flex h-7 w-7 items-center justify-center rounded-full">
                     <svg
                       aria-hidden="true"
                       viewBox="0 0 20 20"
@@ -426,30 +418,32 @@ export function UploadQueue({ albumId }: { albumId: string }) {
                       />
                     </svg>
                   </span>
-                  <span className="text-foreground text-[11px] font-medium leading-snug">
-                    Já enviada para este álbum
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleDismiss(item.id)}
-                    className="text-brand-600 text-[11px] font-semibold underline"
-                  >
-                    Remover
-                  </button>
-                </div>
+                </button>
               ) : (
                 item.status === "error" && (
                   <button
                     type="button"
                     onClick={() => handleRetry(item.id)}
                     aria-label={`Tentar novamente: ${item.errorMessage}`}
-                    className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 px-2 text-center text-white"
+                    title={`${item.errorMessage} — tocar para tentar novamente`}
+                    className="absolute inset-0 flex items-center justify-center bg-black/60"
                   >
-                    <span role="alert" className="text-[11px] font-medium">
-                      {item.errorMessage}
-                    </span>
-                    <span className="text-[11px] font-semibold underline">
-                      Tentar novamente
+                    <span
+                      role="alert"
+                      className="bg-danger/80 flex h-7 w-7 items-center justify-center rounded-full text-white"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className="h-4 w-4"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M4.22 4.22a.75.75 0 0 1 1.06 0L10 8.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L11.06 10l4.72 4.72a.75.75 0 1 1-1.06 1.06L10 11.06l-4.72 4.72a.75.75 0 0 1-1.06-1.06L8.94 10 4.22 5.28a.75.75 0 0 1 0-1.06Z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
                     </span>
                   </button>
                 )
@@ -460,13 +454,13 @@ export function UploadQueue({ albumId }: { albumId: string }) {
                   type="button"
                   onClick={() => handleCancel(item.id)}
                   aria-label="Cancelar envio"
-                  className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
+                  className="absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white"
                 >
                   <svg
                     aria-hidden="true"
                     viewBox="0 0 20 20"
                     fill="currentColor"
-                    className="h-3.5 w-3.5"
+                    className="h-2.5 w-2.5"
                   >
                     <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
                   </svg>
@@ -476,6 +470,32 @@ export function UploadQueue({ albumId }: { albumId: string }) {
           ))}
         </ul>
       )}
+
+      <label className="bg-brand-600 hover:bg-brand-700 flex cursor-pointer items-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold text-white shadow-lg transition-colors">
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className="h-5 w-5"
+        >
+          <path
+            fillRule="evenodd"
+            d="M6.5 3.5A1.5 1.5 0 0 1 7.83 2.6l.5-1A1.5 1.5 0 0 1 9.67 1h.66a1.5 1.5 0 0 1 1.34 1.6l.5 1a1.5 1.5 0 0 0 1.33.9H15a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2h1.17a1.5 1.5 0 0 0 1.33-.9v-.1ZM10 13a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
+            clipRule="evenodd"
+          />
+        </svg>
+        Escolher ou tirar fotografias
+        <input
+          type="file"
+          accept={ACCEPTED_TYPES.join(",")}
+          multiple
+          onChange={(event) => {
+            handleFilesSelected(event.target.files);
+            event.target.value = "";
+          }}
+          className="sr-only"
+        />
+      </label>
     </div>
   );
 }
