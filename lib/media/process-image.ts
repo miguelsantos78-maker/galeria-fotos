@@ -32,15 +32,24 @@ function readMetadata(original: Buffer) {
     });
 }
 
+/**
+ * As três derivadas partem de `.clone()` da mesma pipeline já rodada
+ * (`base`), em vez de um `sharp(original)` independente cada uma —
+ * `clone()` reaproveita a descodificação do original já feita para a
+ * primeira, evitando descodificar o mesmo ficheiro (até
+ * `MAX_INPUT_PIXELS`) três vezes seguidas. Ver a documentação do sharp
+ * sobre `clone()` para "criar múltiplas saídas a partir de uma única
+ * entrada, lida uma só vez".
+ */
 function renderDerivatives(
   original: Buffer,
   edges: { previewMaxEdge: number; thumbnailMaxEdge: number },
 ) {
-  const rotated = () =>
-    sharp(original, { limitInputPixels: MAX_INPUT_PIXELS }).rotate();
+  const base = sharp(original, { limitInputPixels: MAX_INPUT_PIXELS }).rotate();
 
   return Promise.all([
-    rotated()
+    base
+      .clone()
       .resize({
         width: edges.previewMaxEdge,
         height: edges.previewMaxEdge,
@@ -49,7 +58,8 @@ function renderDerivatives(
       })
       .webp({ quality: PREVIEW_QUALITY })
       .toBuffer(),
-    rotated()
+    base
+      .clone()
       .resize({
         width: edges.thumbnailMaxEdge,
         height: edges.thumbnailMaxEdge,
@@ -58,7 +68,8 @@ function renderDerivatives(
       })
       .webp({ quality: THUMBNAIL_QUALITY })
       .toBuffer(),
-    rotated()
+    base
+      .clone()
       .resize(BLURHASH_EDGE, BLURHASH_EDGE, { fit: "inside" })
       .ensureAlpha()
       .raw()

@@ -8,6 +8,18 @@ import { createSupabaseBrowserClient } from "@/lib/db/supabase-browser";
 const FALLBACK_REFETCH_INTERVAL_MS = 15_000;
 
 /**
+ * Espera por uma pausa nos eventos antes de invalidar (secção 16:
+ * limites de concorrência) — cada invalidação refaz *todas* as páginas
+ * já carregadas de uma consulta paginada (não só a mais recente), para
+ * as manter consistentes entre si. Sem isto, uma rajada de envios (ex.:
+ * vários convidados a enviar fotos ao mesmo tempo durante o evento)
+ * dispararia essa mesma cascata de pedidos uma vez por fotografia; com
+ * debounce, uma rajada inteira só provoca uma única invalidação, pouco
+ * depois de a rajada abrandar.
+ */
+const INVALIDATE_DEBOUNCE_MS = 800;
+
+/**
  * Subscreve `postgres_changes` em `photos`, filtrado por `album_id`
  * (secção 11). Nunca confia no payload do evento — só o usa como sinal
  * para invalidar a query e refazer o pedido autorizado do costume
@@ -25,11 +37,15 @@ export function usePhotosRealtime(albumId: string) {
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
     let isMounted = true;
+    let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
     const invalidate = () => {
-      void queryClient.invalidateQueries({
-        queryKey: ["albums", albumId, "photos"],
-      });
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        void queryClient.invalidateQueries({
+          queryKey: ["albums", albumId, "photos"],
+        });
+      }, INVALIDATE_DEBOUNCE_MS);
     };
 
     const channel = supabase
@@ -51,6 +67,7 @@ export function usePhotosRealtime(albumId: string) {
 
     return () => {
       isMounted = false;
+      if (debounceTimer) clearTimeout(debounceTimer);
       void supabase.removeChannel(channel);
     };
   }, [albumId, queryClient]);

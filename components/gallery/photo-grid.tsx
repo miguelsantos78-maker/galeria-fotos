@@ -1,12 +1,48 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api/client";
 import type { ListPhotosResult } from "@/server/use-cases/photos";
 import { usePhotosRealtime } from "@/lib/realtime/use-photos-realtime";
 import { Lightbox } from "./lightbox";
+import { PhotoTile } from "./photo-tile";
+import { VirtualizedPhotoGrid } from "./virtualized-photo-grid";
+
+/** Acima disto, a grelha passa a virtualizar por linhas (secção 16:
+ * "virtualizar a grelha quando o número de fotografias justificar") —
+ * abaixo, a grelha simples já é suficiente e mais fácil de percorrer. */
+const VIRTUALIZE_THRESHOLD = 60;
+
+/** "Já montou no cliente?" — o padrão recomendado pelo próprio React
+ * para isto (em vez de `useState` + `useEffect`, que dispara uma
+ * segunda renderização evitável): `getServerSnapshot` devolve sempre
+ * `false`, nunca `true`, portanto o resultado no servidor e na
+ * primeira passagem no cliente coincidem sempre — sem isso,
+ * `useSyncExternalStore` lançaria um aviso de hidratação inconsistente. */
+function subscribeNever() {
+  return () => {};
+}
+function getMountedSnapshot() {
+  return true;
+}
+function getServerMountedSnapshot() {
+  return false;
+}
+function useMounted(): boolean {
+  return useSyncExternalStore(
+    subscribeNever,
+    getMountedSnapshot,
+    getServerMountedSnapshot,
+  );
+}
 
 /**
  * Grelha responsiva com paginação por cursor, lightbox e tempo real
@@ -45,12 +81,22 @@ export function PhotoGrid({
       ),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    // O tempo real (usePhotosRealtime, com fallback periódico) já
+    // mantém isto atualizado — refazer também ao voltar à aba
+    // duplicaria pedidos sem trazer nada de novo.
+    refetchOnWindowFocus: false,
   });
 
   const photos = query.data?.pages.flatMap((page) => page.photos) ?? [];
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
 
   const [presenting, setPresenting] = useState(false);
+
+  // A virtualização (abaixo) só pode ligar-se depois de montado no
+  // cliente — nunca durante a renderização no servidor, para não
+  // arriscar `useWindowVirtualizer` a tocar em `window` nesse passo.
+  const mounted = useMounted();
+  const shouldVirtualize = mounted && photos.length > VIRTUALIZE_THRESHOLD;
 
   const openPhotoId = searchParams.get("photo");
   const openIndex = openPhotoId
@@ -154,27 +200,25 @@ export function PhotoGrid({
               padrão de um álbum partilhado (secção 1/10.1): tudo até à
               borda do ecrã em telemóvel. Miniaturas mais altas do que
               largas (4:5), não quadradas, para dar mais destaque a
-              cada fotografia. */}
-          <div className="grid grid-cols-3 gap-0.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-            {photos.map((photo) => (
-              <button
-                key={photo.id}
-                type="button"
-                onClick={() => updatePhotoParam(photo.id)}
-                className="bg-surface-muted focus-visible:ring-brand-600 relative block aspect-[4/5] w-full overflow-hidden focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset"
-              >
-                {photo.thumbnailUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element -- URL assinado de um domínio de Storage dinâmico (por instalação); ver docs/decisions/0005.
-                  <img
-                    src={photo.thumbnailUrl}
-                    alt="Fotografia do álbum"
-                    loading="lazy"
-                    className="absolute inset-0 h-full w-full object-cover"
-                  />
-                )}
-              </button>
-            ))}
-          </div>
+              cada fotografia. Acima de VIRTUALIZE_THRESHOLD, só as
+              linhas visíveis chegam a ser montadas (ver
+              virtualized-photo-grid.tsx) — a sentinela abaixo continua
+              a funcionar sem alterações, porque a posição dela na
+              página depende da altura total reservada, não do número
+              de nós DOM realmente montados. */}
+          {shouldVirtualize ? (
+            <VirtualizedPhotoGrid photos={photos} onOpen={updatePhotoParam} />
+          ) : (
+            <div className="grid grid-cols-3 gap-0.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+              {photos.map((photo) => (
+                <PhotoTile
+                  key={photo.id}
+                  photo={photo}
+                  onOpen={updatePhotoParam}
+                />
+              ))}
+            </div>
+          )}
 
           <div ref={sentinelRef} aria-hidden="true" className="h-1" />
 

@@ -57,6 +57,23 @@ async function mockEmptyPhotos(page: import("@playwright/test").Page) {
   });
 }
 
+const TINY_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+function photoRow(id: string) {
+  return {
+    id,
+    width: 800,
+    height: 600,
+    blurhash: null,
+    status: "ready",
+    isFeatured: false,
+    uploadedAt: new Date().toISOString(),
+    previewUrl: `https://signed.example.com/${id}.png`,
+    thumbnailUrl: `https://signed.example.com/${id}-thumb.png`,
+  };
+}
+
 test("um convidado abre um link válido e vê o álbum", async ({ page }) => {
   await mockResolve(page);
   await mockEmptyPhotos(page);
@@ -175,4 +192,51 @@ test("mostra a fotografia de capa quando o álbum tem uma definida", async ({
     .analyze();
 
   expect(results.violations).toEqual([]);
+});
+
+test("virtualiza a grelha para álbuns com muitas fotografias, e continua a abrir o lightbox", async ({
+  page,
+}) => {
+  const PHOTO_COUNT = 90;
+  await page.route("https://signed.example.com/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: Buffer.from(TINY_PNG_BASE64, "base64"),
+    });
+  });
+  await mockResolve(page, { permissions: ["view"] });
+  await page.route("**/api/albums/*/photos*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          photos: Array.from({ length: PHOTO_COUNT }, (_, i) =>
+            photoRow(`p${i + 1}`),
+          ),
+          nextCursor: null,
+        },
+        error: null,
+      }),
+    });
+  });
+
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto("/a/token-de-teste");
+  await expect(
+    page.getByRole("heading", { name: "Casamento da Ana e do João" }),
+  ).toBeVisible();
+
+  const tiles = page.locator('button:has(img[alt="Fotografia do álbum"])');
+  await expect(tiles.first()).toBeVisible();
+
+  // Só uma fração das 90 fotografias chega a montar-se no DOM de cada
+  // vez — é a própria prova de que a virtualização está ativa.
+  const mountedCount = await tiles.count();
+  expect(mountedCount).toBeGreaterThan(0);
+  expect(mountedCount).toBeLessThan(PHOTO_COUNT);
+
+  await tiles.first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
 });
