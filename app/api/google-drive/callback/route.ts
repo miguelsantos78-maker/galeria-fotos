@@ -6,6 +6,7 @@ import { createGoogleConnectionsRepository } from "@/server/repositories/google-
 import { createAuditLogRepository } from "@/server/repositories/audit-log-repository";
 import { completeGoogleDriveConnection } from "@/server/use-cases/google-drive-connection";
 import { OAUTH_STATE_COOKIE, OAUTH_VERIFIER_COOKIE } from "@/lib/google-drive/oauth-cookies";
+import { logger } from "@/lib/observability/logger";
 
 const INTEGRATIONS_PATH = "/admin/settings/integrations";
 
@@ -42,7 +43,12 @@ export async function GET(request: Request) {
         auditLog: createAuditLogRepository(supabase),
       },
     );
-  } catch {
+  } catch (error) {
+    logger.error({
+      operation: "googleDrive.callback.completeConnection",
+      userId: profile.id,
+      message: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.redirect(
       `${origin}${INTEGRATIONS_PATH}?error=google_drive_connect_failed`,
     );

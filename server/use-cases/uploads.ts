@@ -257,17 +257,24 @@ export async function completeUpload(
   const thumbnailPath = buildThumbnailPath(ctx.albumId, photoId);
 
   try {
-    await deps.previewStorage.upload(
-      previewPath,
-      processed.previewBuffer,
-      "image/webp",
-    );
-    await deps.previewStorage.upload(
-      thumbnailPath,
-      processed.thumbnailBuffer,
-      "image/webp",
-    );
-  } catch {
+    await Promise.all([
+      deps.previewStorage.upload(
+        previewPath,
+        processed.previewBuffer,
+        "image/webp",
+      ),
+      deps.previewStorage.upload(
+        thumbnailPath,
+        processed.thumbnailBuffer,
+        "image/webp",
+      ),
+    ]);
+  } catch (error) {
+    logger.error({
+      operation: "uploads.completeUpload.previewStorageUpload",
+      albumId: ctx.albumId,
+      message: error instanceof Error ? error.message : String(error),
+    });
     await provider.deleteFile({ fileId: driveFile.fileId }).catch(() => {});
     await deps.uploadJobs.update(job.id, { status: "failed" });
     throw new AppError(
