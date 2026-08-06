@@ -30,10 +30,15 @@ interface DashboardDeps {
 
 /**
  * Estatísticas do painel de administração (secção 10.4/18): número de
- * álbuns, fotografias, uploads recentes e erros. Busca os dados dos
- * álbuns do dono numa só vez e agrega em memória — simples e suficiente
- * para a escala esperada de um MVP (ver docs/decisions/0007); otimizar
- * com contagens dedicadas fica para quando o volume o justificar.
+ * álbuns, fotografias, uploads recentes e erros.
+ *
+ * Cada número vem de uma consulta que devolve exatamente o que é
+ * preciso — contagens no Postgres (`head: true`, nenhuma linha
+ * atravessa a rede) e só as 5 fotografias mais recentes. A versão
+ * anterior carregava todas as fotografias e todos os envios do dono
+ * para memória só para os contar e ordenar em JavaScript, o que num
+ * álbum de milhares de fotografias significava transferir milhares de
+ * linhas completas para produzir dois números e uma lista de cinco.
  */
 export async function getDashboardStats(
   ownerId: string,
@@ -45,30 +50,24 @@ export async function getDashboardStats(
     albums.map((album) => [album.id, album.title]),
   );
 
-  const [photos, uploadJobs] = await Promise.all([
-    deps.photos.listForAlbumIds(albumIds),
-    deps.uploadJobs.listForAlbumIds(albumIds),
+  const [photosCount, recentPhotos, failedUploadsCount] = await Promise.all([
+    deps.photos.countForAlbumIds(albumIds),
+    deps.photos.listRecentForAlbumIds(albumIds, RECENT_UPLOADS_LIMIT),
+    deps.uploadJobs.countFailedForAlbumIds(albumIds),
   ]);
 
-  const recentUploads: DashboardRecentUpload[] = [...photos]
-    .sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at))
-    .slice(0, RECENT_UPLOADS_LIMIT)
-    .map((photo) => ({
-      photoId: photo.id,
-      albumId: photo.album_id,
-      albumTitle: albumTitleById.get(photo.album_id) ?? "—",
-      filename: photo.original_filename,
-      uploadedAt: photo.uploaded_at,
-      status: photo.status,
-    }));
-
-  const failedUploadsCount = uploadJobs.filter(
-    (job) => job.status === "failed",
-  ).length;
+  const recentUploads: DashboardRecentUpload[] = recentPhotos.map((photo) => ({
+    photoId: photo.id,
+    albumId: photo.album_id,
+    albumTitle: albumTitleById.get(photo.album_id) ?? "—",
+    filename: photo.original_filename,
+    uploadedAt: photo.uploaded_at,
+    status: photo.status,
+  }));
 
   return {
     albumsCount: albums.length,
-    photosCount: photos.length,
+    photosCount,
     recentUploads,
     failedUploadsCount,
   };

@@ -53,8 +53,16 @@ export interface PhotosRepository {
   update(id: string, patch: PhotoUpdate): Promise<PhotoRow | null>;
   /** Todas as fotografias não eliminadas do álbum, para o painel de administração. */
   listForOwner(input: ListPhotosForOwnerInput): Promise<PhotoRow[]>;
-  /** Para estatísticas do dashboard (secção 10.4/18) — vários álbuns de um dono. */
+  /**
+   * Todas as fotografias não eliminadas de vários álbuns. Usado pela
+   * sincronização com o Drive (`drive-sync.ts`), que precisa mesmo de
+   * percorrer cada linha — para *contar*, usar `countForAlbumIds`.
+   */
   listForAlbumIds(albumIds: string[]): Promise<PhotoRow[]>;
+  /** Só o total, para o dashboard (secção 10.4/18) — sem trazer linhas. */
+  countForAlbumIds(albumIds: string[]): Promise<number>;
+  /** As `limit` fotografias mais recentes, para "uploads recentes". */
+  listRecentForAlbumIds(albumIds: string[], limit: number): Promise<PhotoRow[]>;
 }
 
 /**
@@ -203,6 +211,34 @@ export function createPhotosRepository(
         .select("*")
         .in("album_id", albumIds)
         .is("deleted_at", null);
+
+      if (error) throw error;
+      return data;
+    },
+
+    async countForAlbumIds(albumIds) {
+      if (albumIds.length === 0) return 0;
+
+      const { count, error } = await db
+        .from("photos")
+        .select("*", { count: "exact", head: true })
+        .in("album_id", albumIds)
+        .is("deleted_at", null);
+
+      if (error) throw error;
+      return count ?? 0;
+    },
+
+    async listRecentForAlbumIds(albumIds, limit) {
+      if (albumIds.length === 0) return [];
+
+      const { data, error } = await db
+        .from("photos")
+        .select("*")
+        .in("album_id", albumIds)
+        .is("deleted_at", null)
+        .order("uploaded_at", { ascending: false })
+        .limit(limit);
 
       if (error) throw error;
       return data;

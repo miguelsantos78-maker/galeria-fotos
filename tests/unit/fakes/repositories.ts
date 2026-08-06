@@ -331,8 +331,7 @@ export function createFakePhotosRepository(
             row.deleted_at === null &&
             visibleStatuses.has(row.status) &&
             (uploadedBy === undefined || row.uploaded_by === uploadedBy) &&
-            (beforeSortOrder === undefined ||
-              row.sort_order < beforeSortOrder),
+            (beforeSortOrder === undefined || row.sort_order < beforeSortOrder),
         )
         .sort((a, b) => b.sort_order - a.sort_order)
         .slice(0, limit);
@@ -360,9 +359,7 @@ export function createFakePhotosRepository(
       return rows
         .filter((row) => row.album_id === albumId && row.deleted_at === null)
         .sort((a, b) => {
-          const primary =
-            (b[sortBy] ?? "").localeCompare(a[sortBy] ?? "") ||
-            0;
+          const primary = (b[sortBy] ?? "").localeCompare(a[sortBy] ?? "") || 0;
           return primary !== 0 ? primary : b.sort_order - a.sort_order;
         })
         .slice(offset, offset + limit);
@@ -371,6 +368,19 @@ export function createFakePhotosRepository(
       return rows.filter(
         (row) => albumIds.includes(row.album_id) && row.deleted_at === null,
       );
+    },
+    async countForAlbumIds(albumIds) {
+      return rows.filter(
+        (row) => albumIds.includes(row.album_id) && row.deleted_at === null,
+      ).length;
+    },
+    async listRecentForAlbumIds(albumIds, limit) {
+      return rows
+        .filter(
+          (row) => albumIds.includes(row.album_id) && row.deleted_at === null,
+        )
+        .sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at))
+        .slice(0, limit);
     },
   };
 }
@@ -423,6 +433,11 @@ export function createFakeUploadJobsRepository(
       return rows
         .filter((row) => albumIds.includes(row.album_id))
         .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    },
+    async countFailedForAlbumIds(albumIds) {
+      return rows.filter(
+        (row) => albumIds.includes(row.album_id) && row.status === "failed",
+      ).length;
     },
   };
 }

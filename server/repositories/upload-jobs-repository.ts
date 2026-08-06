@@ -14,6 +14,8 @@ export interface UploadJobsRepository {
   update(id: string, patch: UploadJobUpdate): Promise<UploadJobRow | null>;
   /** Para "uploads recentes e erros" no dashboard — vários álbuns de um dono. */
   listForAlbumIds(albumIds: string[]): Promise<UploadJobRow[]>;
+  /** Só o número de envios falhados, sem trazer as linhas (dashboard). */
+  countFailedForAlbumIds(albumIds: string[]): Promise<number>;
   /**
    * Apaga sessões de envio já concluídas ou caducadas há mais do que
    * `olderThan` (`server/use-cases/maintenance.ts`). Nunca apaga
@@ -73,6 +75,19 @@ export function createUploadJobsRepository(
 
       if (error) throw error;
       return data?.length ?? 0;
+    },
+
+    async countFailedForAlbumIds(albumIds) {
+      if (albumIds.length === 0) return 0;
+
+      const { count, error } = await db
+        .from("upload_jobs")
+        .select("*", { count: "exact", head: true })
+        .in("album_id", albumIds)
+        .eq("status", "failed");
+
+      if (error) throw error;
+      return count ?? 0;
     },
 
     async listForAlbumIds(albumIds) {
