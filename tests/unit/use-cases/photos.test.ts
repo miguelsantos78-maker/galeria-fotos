@@ -131,4 +131,97 @@ describe("listPhotosForViewer", () => {
     expect(result.photos[0].previewUrl).toContain("preview.webp");
     expect(result.photos[0].thumbnailUrl).toContain("thumbnail.webp");
   });
+
+  it("devolve o total só na primeira página", async () => {
+    const sessions = createFakeAlbumSessionsRepository([
+      makeAlbumSessionRow({ permissions: ["view"] }),
+    ]);
+    const photos = createFakePhotosRepository(
+      Array.from({ length: 5 }, (_, i) =>
+        makePhotoRow({ album_id: "album-1", status: "ready", sort_order: i }),
+      ),
+    );
+
+    const firstPage = await listPhotosForViewer(
+      "album-1",
+      "user-1",
+      { limit: 2 },
+      { sessions, photos, createSignedUrls: fakeSignedUrls },
+    );
+    expect(firstPage.totalCount).toBe(5);
+
+    const secondPage = await listPhotosForViewer(
+      "album-1",
+      "user-1",
+      { limit: 2, cursor: firstPage.nextCursor ?? undefined },
+      { sessions, photos, createSignedUrls: fakeSignedUrls },
+    );
+    expect(secondPage.totalCount).toBeNull();
+  });
+
+  it("marca isMine só nas fotografias enviadas por quem está a ver", async () => {
+    const sessions = createFakeAlbumSessionsRepository([
+      makeAlbumSessionRow({ permissions: ["view"] }),
+    ]);
+    const photos = createFakePhotosRepository([
+      makePhotoRow({
+        album_id: "album-1",
+        status: "ready",
+        sort_order: 2,
+        uploaded_by: "user-1",
+      }),
+      makePhotoRow({
+        album_id: "album-1",
+        status: "ready",
+        sort_order: 1,
+        uploaded_by: "outro-convidado",
+      }),
+    ]);
+
+    const result = await listPhotosForViewer(
+      "album-1",
+      "user-1",
+      {},
+      { sessions, photos, createSignedUrls: fakeSignedUrls },
+    );
+
+    expect(result.photos.map((photo) => photo.isMine)).toEqual([true, false]);
+  });
+
+  it("com onlyMine, devolve e conta apenas as fotografias do próprio", async () => {
+    const sessions = createFakeAlbumSessionsRepository([
+      makeAlbumSessionRow({ permissions: ["view"] }),
+    ]);
+    const photos = createFakePhotosRepository([
+      makePhotoRow({
+        album_id: "album-1",
+        status: "ready",
+        sort_order: 3,
+        uploaded_by: "user-1",
+      }),
+      makePhotoRow({
+        album_id: "album-1",
+        status: "ready",
+        sort_order: 2,
+        uploaded_by: "outro-convidado",
+      }),
+      makePhotoRow({
+        album_id: "album-1",
+        status: "ready",
+        sort_order: 1,
+        uploaded_by: "outro-convidado",
+      }),
+    ]);
+
+    const result = await listPhotosForViewer(
+      "album-1",
+      "user-1",
+      { onlyMine: true },
+      { sessions, photos, createSignedUrls: fakeSignedUrls },
+    );
+
+    expect(result.photos).toHaveLength(1);
+    expect(result.photos[0].isMine).toBe(true);
+    expect(result.totalCount).toBe(1);
+  });
 });

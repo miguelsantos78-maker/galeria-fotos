@@ -50,7 +50,7 @@ async function mockEmptyPhotos(page: import("@playwright/test").Page) {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        data: { photos: [], nextCursor: null },
+        data: { photos: [], nextCursor: null, totalCount: 0 },
         error: null,
       }),
     });
@@ -60,7 +60,7 @@ async function mockEmptyPhotos(page: import("@playwright/test").Page) {
 const TINY_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
-function photoRow(id: string) {
+function photoRow(id: string, isMine = false) {
   return {
     id,
     width: 800,
@@ -71,6 +71,7 @@ function photoRow(id: string) {
     uploadedAt: new Date().toISOString(),
     previewUrl: `https://signed.example.com/${id}.png`,
     thumbnailUrl: `https://signed.example.com/${id}-thumb.png`,
+    isMine,
   };
 }
 
@@ -216,6 +217,7 @@ test("virtualiza a grelha para álbuns com muitas fotografias, e continua a abri
             photoRow(`p${i + 1}`),
           ),
           nextCursor: null,
+          totalCount: PHOTO_COUNT,
         },
         error: null,
       }),
@@ -239,4 +241,48 @@ test("virtualiza a grelha para álbuns com muitas fotografias, e continua a abri
 
   await tiles.first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
+});
+
+test("mostra o contador e filtra pelas fotografias do próprio convidado", async ({
+  page,
+}) => {
+  await page.route("https://signed.example.com/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: Buffer.from(TINY_PNG_BASE64, "base64"),
+    });
+  });
+  await mockResolve(page, { permissions: ["view"] });
+
+  // O servidor é que filtra (?mine=true) — o mock responde em
+  // conformidade, como o endpoint real faria.
+  await page.route("**/api/albums/*/photos*", async (route) => {
+    const onlyMine = new URL(route.request().url()).searchParams.get("mine");
+    const photos =
+      onlyMine === "true"
+        ? [photoRow("p1", true)]
+        : [photoRow("p1", true), photoRow("p2"), photoRow("p3")];
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: { photos, nextCursor: null, totalCount: photos.length },
+        error: null,
+      }),
+    });
+  });
+
+  await page.goto("/a/token-de-teste");
+
+  await expect(page.getByText("3 fotografias")).toBeVisible();
+
+  const filterButton = page.getByRole("button", { name: "As minhas" });
+  await filterButton.click();
+
+  await expect(page.getByText("1 fotografia sua")).toBeVisible();
+  await expect(filterButton).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.locator('button:has(img[alt="Fotografia do álbum"])'),
+  ).toHaveCount(1);
 });

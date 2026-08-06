@@ -12,6 +12,13 @@ export interface AlbumSessionsRepository {
     albumId: string,
     userId: string,
   ): Promise<AlbumSessionRow | null>;
+  /**
+   * Apaga sessões expiradas há mais do que `olderThan` — cada abertura
+   * de um link cria uma linha nova, por isso sem isto a tabela cresce
+   * indefinidamente (`server/use-cases/maintenance.ts`). Devolve
+   * quantas foram apagadas.
+   */
+  deleteExpiredBefore(olderThan: Date): Promise<number>;
 }
 
 export function createAlbumSessionsRepository(
@@ -39,6 +46,17 @@ export function createAlbumSessionsRepository(
         .gt("expires_at", new Date().toISOString());
 
       if (error) throw error;
+    },
+
+    async deleteExpiredBefore(olderThan) {
+      const { data, error } = await db
+        .from("album_sessions")
+        .delete()
+        .lt("expires_at", olderThan.toISOString())
+        .select("id");
+
+      if (error) throw error;
+      return data?.length ?? 0;
     },
 
     async findValidForUser(albumId, userId) {

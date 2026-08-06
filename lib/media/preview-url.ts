@@ -3,8 +3,20 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/database.types";
 import { PHOTO_PREVIEWS_BUCKET } from "./constants";
 
-/** URLs assinados de curta duração (secção 5.4) — nunca URLs públicas permanentes. */
-const SIGNED_URL_TTL_SECONDS = 5 * 60;
+/**
+ * URLs assinados de duração limitada (secção 5.4) — nunca URLs
+ * públicas permanentes.
+ *
+ * Uma hora, não cinco minutos: num álbum grande (centenas ou milhares
+ * de fotografias) um convidado passa facilmente mais de cinco minutos
+ * a percorrer a galeria, e as miniaturas já carregadas partiam-se
+ * quando os URLs caducavam a meio da visita. Continua bem abaixo da
+ * validade da própria `album_session` (24h, ver
+ * `server/use-cases/resolve-album.ts`), por isso revogar um link
+ * continua a fechar o acesso muito antes de o último URL emitido
+ * expirar.
+ */
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 /** Assina vários caminhos numa só chamada (evita N pedidos sequenciais na grelha). */
 export async function createSignedPreviewUrls(

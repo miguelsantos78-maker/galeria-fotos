@@ -11,6 +11,8 @@ export interface ListVisiblePhotosInput {
   canModerate: boolean;
   limit: number;
   beforeSortOrder?: number;
+  /** Só as fotografias enviadas por este utilizador (filtro "as minhas"). */
+  uploadedBy?: string;
 }
 
 export type PhotoSortField = "uploaded_at" | "captured_at";
@@ -19,11 +21,17 @@ export interface ListPhotosForOwnerInput {
   albumId: string;
   sortBy: PhotoSortField;
   limit: number;
+  offset?: number;
 }
 
-/** Limite fixo para a listagem de administração (secção 10.4) — sem
- * paginação por cursor ainda, ver docs/decisions/0007. */
-const OWNER_LISTING_MAX = 200;
+/**
+ * Teto por página da listagem de administração (secção 10.4) — protege
+ * contra um `limit` absurdo vindo do pedido, mas já não limita o total
+ * visível: acima disto, o painel pagina (ver `offset`). Antes era um
+ * limite absoluto de 200, o que tornava as restantes fotografias de um
+ * álbum grande invisíveis e impossíveis de gerir.
+ */
+const OWNER_PAGE_MAX = 100;
 
 export interface PhotosRepository {
   insert(input: PhotoInsert): Promise<PhotoRow>;
@@ -33,6 +41,15 @@ export interface PhotosRepository {
   ): Promise<PhotoRow | null>;
   findById(id: string): Promise<PhotoRow | null>;
   listVisibleForAlbum(input: ListVisiblePhotosInput): Promise<PhotoRow[]>;
+  /**
+   * Só o total, sem trazer nenhuma linha — para o contador da galeria.
+   * Mesmos filtros de visibilidade de `listVisibleForAlbum`.
+   */
+  countVisibleForAlbum(input: {
+    albumId: string;
+    canModerate: boolean;
+    uploadedBy?: string;
+  }): Promise<number>;
   update(id: string, patch: PhotoUpdate): Promise<PhotoRow | null>;
   /** Todas as fotografias não eliminadas do álbum, para o painel de administração. */
   listForOwner(input: ListPhotosForOwnerInput): Promise<PhotoRow[]>;
@@ -94,6 +111,7 @@ export function createPhotosRepository(
       canModerate,
       limit,
       beforeSortOrder,
+      uploadedBy,
     }) {
       let query = db
         .from("photos")
@@ -105,6 +123,10 @@ export function createPhotosRepository(
         ? query.in("status", ["ready", "pending_review"])
         : query.eq("status", "ready");
 
+      if (uploadedBy !== undefined) {
+        query = query.eq("uploaded_by", uploadedBy);
+      }
+
       if (beforeSortOrder !== undefined) {
         query = query.lt("sort_order", beforeSortOrder);
       }
@@ -115,6 +137,29 @@ export function createPhotosRepository(
 
       if (error) throw error;
       return data;
+    },
+
+    async countVisibleForAlbum({ albumId, canModerate, uploadedBy }) {
+      // head: true — o Postgres devolve só a contagem, nenhuma linha
+      // atravessa a rede.
+      let query = db
+        .from("photos")
+        .select("*", { count: "exact", head: true })
+        .eq("album_id", albumId)
+        .is("deleted_at", null);
+
+      query = canModerate
+        ? query.in("status", ["ready", "pending_review"])
+        : query.eq("status", "ready");
+
+      if (uploadedBy !== undefined) {
+        query = query.eq("uploaded_by", uploadedBy);
+      }
+
+      const { count, error } = await query;
+
+      if (error) throw error;
+      return count ?? 0;
     },
 
     async update(id, patch) {
@@ -129,7 +174,14 @@ export function createPhotosRepository(
       return data;
     },
 
-    async listForOwner({ albumId, sortBy, limit }) {
+    async listForOwner({ albumId, sortBy, limit, offset = 0 }) {
+      // Paginação por deslocamento (não por cursor como na galeria
+      // pública): `captured_at` pode ser nulo, o que torna um cursor
+      // sobre esse campo ambíguo. Aceitável aqui — é uma listagem de
+      // administração, com um álbum de cada vez e um número de páginas
+      // pequeno; a regra de "cursor, não offset" da secção 14 aplica-se
+      // à galeria, que continua por cursor.
+      const pageSize = Math.min(limit, OWNER_PAGE_MAX);
       const { data, error } = await db
         .from("photos")
         .select("*")
@@ -137,7 +189,7 @@ export function createPhotosRepository(
         .is("deleted_at", null)
         .order(sortBy, { ascending: false, nullsFirst: false })
         .order("sort_order", { ascending: false })
-        .limit(Math.min(limit, OWNER_LISTING_MAX));
+        .range(offset, offset + pageSize - 1);
 
       if (error) throw error;
       return data;

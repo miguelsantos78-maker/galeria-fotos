@@ -8,8 +8,8 @@ import { PhotoTile } from "./photo-tile";
 /** `gap-0.5` (0.125rem) na grelha CSS — usado para estimar a altura de
  * cada linha antes da primeira medição real (ver `measureElement`). */
 const GRID_GAP_PX = 2;
-/** `aspect-[4/5]`: altura = largura × 5/4. */
-const HEIGHT_OVER_WIDTH = 5 / 4;
+/** `aspect-square` em `photo-tile.tsx`: altura = largura. */
+const HEIGHT_OVER_WIDTH = 1;
 
 /** Espelha os pontos de quebra do Tailwind usados na grelha
  * (`grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6`) — para

@@ -1,11 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { apiFetch, ApiRequestError } from "@/lib/api/client";
 import { PHOTO_STATUS_LABELS } from "@/lib/media/photo-status-labels";
 import type { AdminPhotoView } from "@/server/use-cases/admin-photo-view";
-import type { BatchModerationResult } from "@/server/use-cases/moderation";
+import type {
+  BatchModerationResult,
+  ListPhotosForOwnerResult,
+} from "@/server/use-cases/moderation";
 
 type SortBy = "uploaded_at" | "captured_at";
 
@@ -21,12 +28,14 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
 
   const queryKey = ["albums", albumId, "photos", "moderation", sortBy];
 
-  const photosQuery = useQuery({
+  const photosQuery = useInfiniteQuery({
     queryKey,
-    queryFn: () =>
-      apiFetch<AdminPhotoView[]>(
-        `/api/albums/${albumId}/photos/moderation?sortBy=${sortBy}`,
+    queryFn: ({ pageParam }: { pageParam: number }) =>
+      apiFetch<ListPhotosForOwnerResult>(
+        `/api/albums/${albumId}/photos/moderation?sortBy=${sortBy}&offset=${pageParam}`,
       ),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
   });
 
   function invalidateAll() {
@@ -118,12 +127,19 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
     );
   }
 
-  const photos = photosQuery.data ?? [];
+  const photos =
+    photosQuery.data?.pages.flatMap((page) => page.photos) ?? [];
 
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-foreground text-lg font-medium">Fotografias</h2>
+        <h2 className="text-foreground text-lg font-medium">
+          Fotografias{" "}
+          <span className="text-foreground/50 text-sm font-normal">
+            ({photos.length}
+            {photosQuery.hasNextPage ? "+" : ""})
+          </span>
+        </h2>
         <div className="flex items-center gap-2 text-sm">
           <span className="text-foreground/60">Ordenar por:</span>
           {(Object.keys(SORT_LABELS) as SortBy[]).map((option) => (
@@ -334,6 +350,17 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {photosQuery.hasNextPage && (
+        <button
+          type="button"
+          onClick={() => photosQuery.fetchNextPage()}
+          disabled={photosQuery.isFetchingNextPage}
+          className="border-border text-foreground hover:bg-surface-muted mx-auto rounded-full border px-5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {photosQuery.isFetchingNextPage ? "A carregar…" : "Carregar mais"}
+        </button>
       )}
     </section>
   );

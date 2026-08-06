@@ -14,6 +14,13 @@ export interface UploadJobsRepository {
   update(id: string, patch: UploadJobUpdate): Promise<UploadJobRow | null>;
   /** Para "uploads recentes e erros" no dashboard — vários álbuns de um dono. */
   listForAlbumIds(albumIds: string[]): Promise<UploadJobRow[]>;
+  /**
+   * Apaga sessões de envio já concluídas ou caducadas há mais do que
+   * `olderThan` (`server/use-cases/maintenance.ts`). Nunca apaga
+   * fotografias — `upload_jobs` é só o registo temporário do envio em
+   * curso. Devolve quantas foram apagadas.
+   */
+  deleteFinishedBefore(olderThan: Date): Promise<number>;
 }
 
 export function createUploadJobsRepository(
@@ -54,6 +61,18 @@ export function createUploadJobsRepository(
 
       if (error) throw error;
       return data;
+    },
+
+    async deleteFinishedBefore(olderThan) {
+      const { data, error } = await db
+        .from("upload_jobs")
+        .delete()
+        .lt("created_at", olderThan.toISOString())
+        .in("status", ["completed", "failed", "expired"])
+        .select("id");
+
+      if (error) throw error;
+      return data?.length ?? 0;
     },
 
     async listForAlbumIds(albumIds) {

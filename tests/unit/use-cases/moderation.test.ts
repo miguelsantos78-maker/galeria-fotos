@@ -131,7 +131,8 @@ describe("moderation use-cases", () => {
         { ...deps, createSignedUrls: fakeSignedUrls },
       );
 
-      expect(result).toHaveLength(3);
+      expect(result.photos).toHaveLength(3);
+      expect(result.nextOffset).toBeNull();
     });
 
     it("marca isCover corretamente e inclui URLs assinados", async () => {
@@ -152,9 +153,36 @@ describe("moderation use-cases", () => {
         { ...deps, createSignedUrls: fakeSignedUrls },
       );
 
-      expect(result[0].isCover).toBe(true);
-      expect(result[0].previewUrl).toContain("preview.webp");
-      expect(result[0].thumbnailUrl).toContain("thumbnail.webp");
+      expect(result.photos[0].isCover).toBe(true);
+      expect(result.photos[0].previewUrl).toContain("preview.webp");
+      expect(result.photos[0].thumbnailUrl).toContain("thumbnail.webp");
+    });
+
+    it("pagina: devolve nextOffset enquanto houver mais páginas", async () => {
+      const { deps, photos } = makeDeps();
+      for (let i = 0; i < 5; i++) {
+        await photos.insert(
+          makePhotoRow({ album_id: "album-1", status: "ready" }),
+        );
+      }
+
+      const firstPage = await listPhotosForOwner(
+        "album-1",
+        "owner-1",
+        { limit: 2 },
+        { ...deps, createSignedUrls: fakeSignedUrls },
+      );
+      expect(firstPage.photos).toHaveLength(2);
+      expect(firstPage.nextOffset).toBe(2);
+
+      const lastPage = await listPhotosForOwner(
+        "album-1",
+        "owner-1",
+        { limit: 2, offset: 4 },
+        { ...deps, createSignedUrls: fakeSignedUrls },
+      );
+      expect(lastPage.photos).toHaveLength(1);
+      expect(lastPage.nextOffset).toBeNull();
     });
   });
 

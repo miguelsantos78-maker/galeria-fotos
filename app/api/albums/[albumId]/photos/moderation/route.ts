@@ -32,17 +32,14 @@ export async function GET(request: Request, { params }: RouteParams) {
       ? photoSortFieldSchema.parse(sortByParam)
       : undefined;
 
-    const limitParam = searchParams.get("limit");
-    const limit = limitParam ? Number(limitParam) : undefined;
-    if (limit !== undefined && !Number.isFinite(limit)) {
-      throw new AppError("VALIDATION_ERROR", "Parâmetro inválido.", 400);
-    }
+    const limit = parseOptionalPositiveInt(searchParams.get("limit"));
+    const offset = parseOptionalPositiveInt(searchParams.get("offset"));
 
     const supabase = createSupabaseAdminClient();
     const photos = await listPhotosForOwner(
       albumId,
       profile.id,
-      { sortBy, limit },
+      { sortBy, limit, offset },
       {
         albums: createAlbumsRepository(supabase),
         photos: createPhotosRepository(supabase),
@@ -54,4 +51,13 @@ export async function GET(request: Request, { params }: RouteParams) {
   } catch (error) {
     return jsonError(error, requestId);
   }
+}
+
+function parseOptionalPositiveInt(value: string | null): number | undefined {
+  if (value === null) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new AppError("VALIDATION_ERROR", "Parâmetro inválido.", 400);
+  }
+  return parsed;
 }

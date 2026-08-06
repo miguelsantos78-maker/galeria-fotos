@@ -15,6 +15,7 @@ import { usePhotosRealtime } from "@/lib/realtime/use-photos-realtime";
 import { Lightbox } from "./lightbox";
 import { PhotoTile } from "./photo-tile";
 import { VirtualizedPhotoGrid } from "./virtualized-photo-grid";
+import { BackToTop } from "./back-to-top";
 
 /** Acima disto, a grelha passa a virtualizar por linhas (secção 16:
  * "virtualizar a grelha quando o número de fotografias justificar") —
@@ -71,24 +72,34 @@ export function PhotoGrid({
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
+  const [onlyMine, setOnlyMine] = useState(false);
+
   const query = useInfiniteQuery({
-    queryKey: ["albums", albumId, "photos"],
-    queryFn: ({ pageParam }: { pageParam: number | undefined }) =>
-      apiFetch<ListPhotosResult>(
-        `/api/albums/${albumId}/photos${
-          pageParam !== undefined ? `?cursor=${pageParam}` : ""
-        }`,
-      ),
+    queryKey: ["albums", albumId, "photos", { onlyMine }],
+    queryFn: ({ pageParam }: { pageParam: number | undefined }) => {
+      const params = new URLSearchParams();
+      if (pageParam !== undefined) params.set("cursor", String(pageParam));
+      if (onlyMine) params.set("mine", "true");
+      const queryString = params.toString();
+      return apiFetch<ListPhotosResult>(
+        `/api/albums/${albumId}/photos${queryString ? `?${queryString}` : ""}`,
+      );
+    },
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    // O tempo real (usePhotosRealtime, com fallback periódico) já
-    // mantém isto atualizado — refazer também ao voltar à aba
-    // duplicaria pedidos sem trazer nada de novo.
-    refetchOnWindowFocus: false,
+    // Deliberadamente NÃO desligado: os URLs das miniaturas são
+    // assinados e expiram (ver lib/media/preview-url.ts), por isso
+    // voltar ao separador ao fim de muito tempo tem de os poder
+    // renovar — sem isto, quem deixasse a galeria aberta encontrava
+    // imagens partidas ao regressar. O `staleTime` global
+    // (app/providers.tsx) já evita que isto dispare a toda a hora.
+    refetchOnWindowFocus: true,
   });
 
   const photos = query.data?.pages.flatMap((page) => page.photos) ?? [];
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
+  // Só a primeira página traz a contagem (ver `listPhotosForViewer`).
+  const totalCount = query.data?.pages[0]?.totalCount ?? null;
 
   const [presenting, setPresenting] = useState(false);
 
@@ -169,38 +180,70 @@ export function PhotoGrid({
         </p>
       )}
 
+      {/* A barra de controlos aparece mesmo com a lista vazia quando o
+          filtro está ligado — senão não haveria forma de o desligar. */}
+      {(photos.length > 0 || onlyMine) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+          <p className="text-foreground/60 text-xs" aria-live="polite">
+            {totalCount !== null &&
+              (onlyMine
+                ? `${totalCount} ${totalCount === 1 ? "fotografia sua" : "fotografias suas"}`
+                : `${totalCount} ${totalCount === 1 ? "fotografia" : "fotografias"}`)}
+          </p>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setOnlyMine((current) => !current)}
+              aria-pressed={onlyMine}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                onlyMine
+                  ? "border-brand-600 bg-brand-600 text-white"
+                  : "border-border text-foreground hover:bg-surface-muted"
+              }`}
+            >
+              As minhas
+            </button>
+
+            {photos.length > 0 && (
+              <button
+                type="button"
+                onClick={openPresentation}
+                aria-label="Iniciar apresentação"
+                className="border-border text-foreground hover:bg-surface-muted inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-3.5 w-3.5"
+                >
+                  <path d="M6 4.5v11l9-5.5-9-5.5Z" />
+                </svg>
+                Apresentação
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {photos.length === 0 ? (
         <div className="rounded-card border-border mx-4 my-6 flex flex-1 flex-col items-center justify-center gap-2 border border-dashed px-8 py-16">
           <p className="text-foreground/70 text-center">
-            Ainda não há fotografias neste álbum.
+            {onlyMine
+              ? "Ainda não enviou nenhuma fotografia para este álbum."
+              : "Ainda não há fotografias neste álbum."}
           </p>
         </div>
       ) : (
         <>
-          <div className="flex justify-end px-3 py-2">
-            <button
-              type="button"
-              onClick={openPresentation}
-              aria-label="Iniciar apresentação"
-              className="border-border text-foreground hover:bg-surface-muted inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors"
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="h-3.5 w-3.5"
-              >
-                <path d="M6 4.5v11l9-5.5-9-5.5Z" />
-              </svg>
-              Apresentação
-            </button>
-          </div>
 
           {/* Grelha densa e sem espaçamento visual entre miniaturas — o
               padrão de um álbum partilhado (secção 1/10.1): tudo até à
-              borda do ecrã em telemóvel. Miniaturas mais altas do que
-              largas (4:5), não quadradas, para dar mais destaque a
-              cada fotografia. Acima de VIRTUALIZE_THRESHOLD, só as
+              borda do ecrã em telemóvel. Quadradas: num álbum com
+              muitas fotografias, miniaturas mais altas tornariam a
+              coluna de scroll desnecessariamente longa. Acima de
+              VIRTUALIZE_THRESHOLD, só as
               linhas visíveis chegam a ser montadas (ver
               virtualized-photo-grid.tsx) — a sentinela abaixo continua
               a funcionar sem alterações, porque a posição dela na
@@ -234,6 +277,10 @@ export function PhotoGrid({
           )}
         </>
       )}
+
+      {/* Escondido com a lightbox aberta: aí o scroll da página está
+          bloqueado e o botão só se sobreporia ao diálogo. */}
+      {openIndex === -1 && <BackToTop />}
 
       {openIndex !== -1 && (
         <Lightbox

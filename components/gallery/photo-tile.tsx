@@ -14,7 +14,7 @@ export function PhotoTile({
     <button
       type="button"
       onClick={() => onOpen(photo.id)}
-      className="bg-surface-muted focus-visible:ring-brand-600 relative block aspect-[4/5] w-full overflow-hidden focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset"
+      className="bg-surface-muted focus-visible:ring-brand-600 relative block aspect-square w-full overflow-hidden focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset"
     >
       {photo.thumbnailUrl && (
         // eslint-disable-next-line @next/next/no-img-element -- URL assinado de um domínio de Storage dinâmico (por instalação); ver docs/decisions/0005.

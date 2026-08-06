@@ -53,35 +53,65 @@ async function loadOwnedPhoto(
   return { photo, album };
 }
 
+/** Página por omissão da listagem de administração — ver
+ * `OWNER_PAGE_MAX` em `photos-repository.ts` para o teto. */
+const OWNER_PAGE_SIZE = 100;
+
+export interface ListPhotosForOwnerResult {
+  photos: AdminPhotoView[];
+  /** Deslocamento da página seguinte, ou `null` quando esta é a última. */
+  nextOffset: number | null;
+}
+
+/**
+ * Listagem paginada para o painel de administração (secção 10.4).
+ * Pede sempre uma fotografia a mais do que a página, só para saber se
+ * ainda há mais alguma — a extra é descartada antes de devolver, nunca
+ * chega ao cliente.
+ */
 export async function listPhotosForOwner(
   albumId: string,
   ownerId: string,
-  options: { sortBy?: "uploaded_at" | "captured_at"; limit?: number },
+  options: {
+    sortBy?: "uploaded_at" | "captured_at";
+    limit?: number;
+    offset?: number;
+  },
   deps: Pick<ModerationDeps, "albums" | "photos"> & {
     createSignedUrls: (paths: string[]) => Promise<Map<string, string>>;
   },
-): Promise<AdminPhotoView[]> {
+): Promise<ListPhotosForOwnerResult> {
   const album = await deps.albums.findById(albumId);
   if (!album || album.owner_id !== ownerId) {
     throw new AppError("FORBIDDEN", "Não tem acesso a este álbum.", 403);
   }
 
-  const photos = await deps.photos.listForOwner({
+  const pageSize = options.limit ?? OWNER_PAGE_SIZE;
+  const offset = options.offset ?? 0;
+
+  const rows = await deps.photos.listForOwner({
     albumId,
     sortBy: options.sortBy ?? "uploaded_at",
-    limit: options.limit ?? 200,
+    limit: pageSize + 1,
+    offset,
   });
 
-  const paths = photos.flatMap((photo) =>
+  const hasMore = rows.length > pageSize;
+  const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+
+  const paths = pageRows.flatMap((photo) =>
     photo.preview_path
       ? [photo.preview_path, buildThumbnailPath(albumId, photo.id)]
       : [],
   );
   const signedUrls = await deps.createSignedUrls(paths);
 
-  return photos.map((photo) =>
-    toAdminPhotoView(photo, album.cover_photo_id, signedUrls),
-  );
+  return {
+    photos: pageRows.map((photo) =>
+      toAdminPhotoView(photo, album.cover_photo_id, signedUrls),
+    ),
+    nextOffset: hasMore ? offset + pageSize : null,
+  };
 }
 
 /**

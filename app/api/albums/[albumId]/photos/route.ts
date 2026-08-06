@@ -25,6 +25,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     const cursor = parseOptionalInt(searchParams.get("cursor"));
     const limit = parseOptionalInt(searchParams.get("limit"));
+    const onlyMine = searchParams.get("mine") === "true";
 
     const supabase = await createSupabaseServerClient();
     const {
@@ -43,7 +44,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     const result = await listPhotosForViewer(
       albumId,
       user.id,
-      { cursor, limit },
+      { cursor, limit, onlyMine },
       {
         sessions: createAlbumSessionsRepository(adminClient),
         photos: createPhotosRepository(adminClient),

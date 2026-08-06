@@ -179,6 +179,13 @@ export function createFakeAlbumSessionsRepository(
         }
       }
     },
+    async deleteExpiredBefore(olderThan) {
+      const cutoff = olderThan.toISOString();
+      const survivors = rows.filter((row) => row.expires_at >= cutoff);
+      const deleted = rows.length - survivors.length;
+      rows.splice(0, rows.length, ...survivors);
+      return deleted;
+    },
     async findValidForUser(albumId, userId) {
       const now = new Date().toISOString();
       const matches = rows
@@ -311,6 +318,7 @@ export function createFakePhotosRepository(
       canModerate,
       limit,
       beforeSortOrder,
+      uploadedBy,
     }: ListVisiblePhotosInput) {
       const visibleStatuses = canModerate
         ? new Set(["ready", "pending_review"])
@@ -322,11 +330,25 @@ export function createFakePhotosRepository(
             row.album_id === albumId &&
             row.deleted_at === null &&
             visibleStatuses.has(row.status) &&
+            (uploadedBy === undefined || row.uploaded_by === uploadedBy) &&
             (beforeSortOrder === undefined ||
               row.sort_order < beforeSortOrder),
         )
         .sort((a, b) => b.sort_order - a.sort_order)
         .slice(0, limit);
+    },
+    async countVisibleForAlbum({ albumId, canModerate, uploadedBy }) {
+      const visibleStatuses = canModerate
+        ? new Set(["ready", "pending_review"])
+        : new Set(["ready"]);
+
+      return rows.filter(
+        (row) =>
+          row.album_id === albumId &&
+          row.deleted_at === null &&
+          visibleStatuses.has(row.status) &&
+          (uploadedBy === undefined || row.uploaded_by === uploadedBy),
+      ).length;
     },
     async update(id, patch) {
       const row = rows.find((r) => r.id === id);
@@ -334,7 +356,7 @@ export function createFakePhotosRepository(
       Object.assign(row, patch);
       return row;
     },
-    async listForOwner({ albumId, sortBy, limit }) {
+    async listForOwner({ albumId, sortBy, limit, offset = 0 }) {
       return rows
         .filter((row) => row.album_id === albumId && row.deleted_at === null)
         .sort((a, b) => {
@@ -343,7 +365,7 @@ export function createFakePhotosRepository(
             0;
           return primary !== 0 ? primary : b.sort_order - a.sort_order;
         })
-        .slice(0, limit);
+        .slice(offset, offset + limit);
     },
     async listForAlbumIds(albumIds) {
       return rows.filter(
@@ -377,6 +399,16 @@ export function createFakeUploadJobsRepository(
       };
       rows.push(row);
       return row;
+    },
+    async deleteFinishedBefore(olderThan) {
+      const cutoff = olderThan.toISOString();
+      const finished = ["completed", "failed", "expired"];
+      const survivors = rows.filter(
+        (row) => !(row.created_at < cutoff && finished.includes(row.status)),
+      );
+      const deleted = rows.length - survivors.length;
+      rows.splice(0, rows.length, ...survivors);
+      return deleted;
     },
     async findById(id) {
       return rows.find((row) => row.id === id) ?? null;
