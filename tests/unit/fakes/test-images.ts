@@ -1,10 +1,7 @@
 import sharp from "sharp";
 
 /** Gera imagens sintéticas reais (via sharp) para os testes de processamento. */
-export function createTestJpeg(
-  width = 120,
-  height = 80,
-): Promise<Buffer> {
+export function createTestJpeg(width = 120, height = 80): Promise<Buffer> {
   return sharp({
     create: {
       width,

@@ -74,7 +74,9 @@ export function createDriveStorageProvider(
       );
 
       if (!created.data.id) {
-        throw new Error("O Google Drive não devolveu um ID para a pasta do álbum.");
+        throw new Error(
+          "O Google Drive não devolveu um ID para a pasta do álbum.",
+        );
       }
       return { folderId: created.data.id };
     },
@@ -108,7 +110,9 @@ export function createDriveStorageProvider(
       );
 
       if (!created.data.id) {
-        throw new Error("O Google Drive não devolveu um ID para o ficheiro enviado.");
+        throw new Error(
+          "O Google Drive não devolveu um ID para o ficheiro enviado.",
+        );
       }
 
       return {
@@ -139,7 +143,10 @@ export function createDriveStorageProvider(
     async verifyConnection(): Promise<ConnectionHealth> {
       try {
         const about = await drive.about.get({ fields: "user" });
-        return { ok: true, accountEmail: about.data.user?.emailAddress ?? null };
+        return {
+          ok: true,
+          accountEmail: about.data.user?.emailAddress ?? null,
+        };
       } catch (error) {
         return {
           ok: false,

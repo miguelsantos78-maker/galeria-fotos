@@ -38,9 +38,7 @@ const photos: PublicPhoto[] = [
 
 /** `Lightbox` usa `useMutation` (botão "Eliminar") mesmo quando `isOwner`
  * é falso — precisa sempre de um `QueryClientProvider` à volta. */
-function renderLightbox(
-  props: Partial<ComponentProps<typeof Lightbox>> = {},
-) {
+function renderLightbox(props: Partial<ComponentProps<typeof Lightbox>> = {}) {
   const queryClient = new QueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
@@ -166,7 +164,9 @@ describe("Lightbox", () => {
   it("mostra o botão Eliminar para o dono do álbum", () => {
     renderLightbox({ isOwner: true });
 
-    expect(screen.getByRole("button", { name: "Eliminar" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Eliminar" }),
+    ).toBeInTheDocument();
   });
 
   it("pede confirmação e chama onDeleted após eliminar com sucesso", async () => {

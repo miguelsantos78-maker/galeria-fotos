@@ -175,7 +175,10 @@ export function PhotoGrid({
   return (
     <div className="flex w-full flex-1 flex-col">
       {!isConnected && (
-        <p role="status" className="text-foreground/70 px-4 py-2 text-center text-xs">
+        <p
+          role="status"
+          className="text-foreground/70 px-4 py-2 text-center text-xs"
+        >
           Ligação em tempo real indisponível — a atualizar periodicamente.
         </p>
       )}
@@ -237,7 +240,6 @@ export function PhotoGrid({
         </div>
       ) : (
         <>
-
           {/* Grelha densa e sem espaçamento visual entre miniaturas — o
               padrão de um álbum partilhado (secção 1/10.1): tudo até à
               borda do ecrã em telemóvel. Quadradas: num álbum com

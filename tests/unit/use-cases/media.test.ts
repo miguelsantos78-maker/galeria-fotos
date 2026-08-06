@@ -17,12 +17,14 @@ import { validServerEnv } from "../fakes/env";
 
 const originalEnv = { ...process.env };
 
-function makeDeps(overrides: {
-  albumOverrides?: Parameters<typeof makeAlbumRow>[0];
-  photoOverrides?: Parameters<typeof makePhotoRow>[0];
-  sessionOverrides?: Parameters<typeof makeAlbumSessionRow>[0] | null;
-  withConnection?: boolean;
-} = {}) {
+function makeDeps(
+  overrides: {
+    albumOverrides?: Parameters<typeof makeAlbumRow>[0];
+    photoOverrides?: Parameters<typeof makePhotoRow>[0];
+    sessionOverrides?: Parameters<typeof makeAlbumSessionRow>[0] | null;
+    withConnection?: boolean;
+  } = {},
+) {
   const album = makeAlbumRow({
     id: "album-1",
     owner_id: "owner-1",

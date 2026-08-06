@@ -28,7 +28,9 @@ export interface ConnectionHealth {
 }
 
 export interface DriveStorageProvider {
-  ensureRootFolder(input: { connectionId: string }): Promise<{ folderId: string }>;
+  ensureRootFolder(input: {
+    connectionId: string;
+  }): Promise<{ folderId: string }>;
   createAlbumFolder(input: {
     parentFolderId: string;
     albumId: string;

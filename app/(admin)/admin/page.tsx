@@ -98,9 +98,7 @@ export default async function AdminDashboardPage() {
                 className="rounded-card border-border flex items-center justify-between gap-3 border px-4 py-2.5 text-sm"
               >
                 <div className="min-w-0">
-                  <p className="text-foreground truncate">
-                    {upload.filename}
-                  </p>
+                  <p className="text-foreground truncate">{upload.filename}</p>
                   <p className="text-foreground/60">
                     {upload.albumTitle} ·{" "}
                     {new Date(upload.uploadedAt).toLocaleString("pt-PT")}

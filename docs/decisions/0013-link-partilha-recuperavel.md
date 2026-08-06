@@ -71,7 +71,7 @@ anterior a esta migração).
 
 - **Migração ainda não aplicada ao projeto Supabase de produção** —
   precisa de ser corrida manualmente (SQL Editor ou `supabase db
-  push`) antes de esta funcionalidade funcionar em produção; até lá, a
+push`) antes de esta funcionalidade funcionar em produção; até lá, a
   criação de links continua a funcionar (as colunas novas aceitam
   `null`), só sem o token ficar recuperável.
 - Links já existentes (criados antes desta migração) não passam a ser

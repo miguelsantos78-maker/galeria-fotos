@@ -102,9 +102,7 @@ export async function listPhotosForViewer(
   const photos = pageRows.map((row) =>
     toPublicPhoto(row, albumId, signedUrls, userId),
   );
-  const nextCursor = hasMore
-    ? pageRows[pageRows.length - 1].sort_order
-    : null;
+  const nextCursor = hasMore ? pageRows[pageRows.length - 1].sort_order : null;
 
   return { photos, nextCursor, totalCount };
 }
@@ -123,9 +121,10 @@ function toPublicPhoto(
     status: row.status,
     isFeatured: row.is_featured,
     uploadedAt: row.uploaded_at,
-    previewUrl: row.preview_path ? (signedUrls.get(row.preview_path) ?? null) : null,
-    thumbnailUrl:
-      signedUrls.get(buildThumbnailPath(albumId, row.id)) ?? null,
+    previewUrl: row.preview_path
+      ? (signedUrls.get(row.preview_path) ?? null)
+      : null,
+    thumbnailUrl: signedUrls.get(buildThumbnailPath(albumId, row.id)) ?? null,
     isMine: row.uploaded_by === viewerId,
   };
 }

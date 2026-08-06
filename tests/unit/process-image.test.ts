@@ -33,9 +33,9 @@ describe("processImage", () => {
     const thumbnailMeta = await sharp(result.thumbnailBuffer).metadata();
 
     expect(previewMeta.format).toBe("webp");
-    expect(Math.max(previewMeta.width ?? 0, previewMeta.height ?? 0)).toBeLessThanOrEqual(
-      EDGES.previewMaxEdge,
-    );
+    expect(
+      Math.max(previewMeta.width ?? 0, previewMeta.height ?? 0),
+    ).toBeLessThanOrEqual(EDGES.previewMaxEdge);
     expect(thumbnailMeta.format).toBe("webp");
     expect(
       Math.max(thumbnailMeta.width ?? 0, thumbnailMeta.height ?? 0),

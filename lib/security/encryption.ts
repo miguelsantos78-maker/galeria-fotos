@@ -1,5 +1,10 @@
 import "server-only";
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "node:crypto";
 import { getServerEnv } from "@/lib/env";
 
 const ALGORITHM = "aes-256-gcm";
@@ -24,10 +29,15 @@ function encryptWithSecret(plaintext: string, secret: string): string {
   const key = deriveKey(secret);
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv(ALGORITHM, key, iv);
-  const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const ciphertext = Buffer.concat([
+    cipher.update(plaintext, "utf8"),
+    cipher.final(),
+  ]);
   const authTag = cipher.getAuthTag();
 
-  return [iv, authTag, ciphertext].map((buf) => buf.toString("base64")).join(":");
+  return [iv, authTag, ciphertext]
+    .map((buf) => buf.toString("base64"))
+    .join(":");
 }
 
 function decryptWithSecret(payload: string, secret: string): string {
@@ -37,7 +47,11 @@ function decryptWithSecret(payload: string, secret: string): string {
   }
 
   const key = deriveKey(secret);
-  const decipher = createDecipheriv(ALGORITHM, key, Buffer.from(ivB64, "base64"));
+  const decipher = createDecipheriv(
+    ALGORITHM,
+    key,
+    Buffer.from(ivB64, "base64"),
+  );
   decipher.setAuthTag(Buffer.from(authTagB64, "base64"));
 
   const plaintext = Buffer.concat([

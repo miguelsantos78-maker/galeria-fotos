@@ -153,9 +153,7 @@ export function Lightbox({
     }
 
     const interval = setInterval(() => {
-      setIndex((current) =>
-        current < photos.length - 1 ? current + 1 : 0,
-      );
+      setIndex((current) => (current < photos.length - 1 ? current + 1 : 0));
     }, AUTO_ADVANCE_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [startInPresentationMode, photos.length]);
@@ -246,7 +244,7 @@ export function Lightbox({
             type="button"
             onClick={goPrev}
             aria-label="Fotografia anterior"
-            className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/30 bg-black/20 p-3 text-lg text-white transition-colors hover:bg-white/10 sm:left-4"
+            className="absolute top-1/2 left-2 z-10 -translate-y-1/2 rounded-full border border-white/30 bg-black/20 p-3 text-lg text-white transition-colors hover:bg-white/10 sm:left-4"
           >
             ‹
           </button>
@@ -257,7 +255,7 @@ export function Lightbox({
             type="button"
             onClick={goNext}
             aria-label="Próxima fotografia"
-            className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/30 bg-black/20 p-3 text-lg text-white transition-colors hover:bg-white/10 sm:right-4"
+            className="absolute top-1/2 right-2 z-10 -translate-y-1/2 rounded-full border border-white/30 bg-black/20 p-3 text-lg text-white transition-colors hover:bg-white/10 sm:right-4"
           >
             ›
           </button>
@@ -307,7 +305,10 @@ export function Lightbox({
         )}
 
         {photos.length <= MAX_PHOTOS_FOR_DOTS && (
-          <div role="presentation" className="flex items-center justify-center gap-1.5">
+          <div
+            role="presentation"
+            className="flex items-center justify-center gap-1.5"
+          >
             {photos.map((dotPhoto, dotIndex) => (
               <span
                 key={dotPhoto.id}

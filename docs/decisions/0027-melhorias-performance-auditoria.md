@@ -28,7 +28,7 @@ mais visível em ficheiros maiores.
 refazendo o pedido em cada remontagem ou regresso à aba. Passa a
 existir um `staleTime` global de 15 segundos. Uma invalidação
 explícita (mutação, evento de tempo real) continua sempre a refazer o
-pedido de imediato — `staleTime` só limita os *refetches automáticos*
+pedido de imediato — `staleTime` só limita os _refetches automáticos_
 implícitos.
 
 Adicionalmente, `components/gallery/photo-grid.tsx` desliga
@@ -40,7 +40,7 @@ periódico de 15s) já a mantém atualizada, tornando o refetch ao voltar
 
 `lib/realtime/use-photos-realtime.ts`: cada evento `postgres_changes`
 invalidava a consulta de imediato — e invalidar uma consulta paginada
-(`useInfiniteQuery`) refaz *todas* as páginas já carregadas, não só a
+(`useInfiniteQuery`) refaz _todas_ as páginas já carregadas, não só a
 mais recente, para as manter consistentes entre si. Numa rajada de
 envios (vários convidados a enviar fotos ao mesmo tempo durante o
 evento), isso disparava essa cascata inteira uma vez por fotografia.
@@ -57,7 +57,7 @@ implementar exatamente o que a secção 16 do `CLAUDE.md` já previa:
 "virtualizar a grelha quando o número de fotografias justificar".
 
 `components/gallery/virtualized-photo-grid.tsx`: virtualiza por
-*linha*, não por fotografia — as fotografias continuam agrupadas em
+_linha_, não por fotografia — as fotografias continuam agrupadas em
 linhas do mesmo tamanho que a grelha CSS responsiva desenharia
 (`useColumnCount` espelha em JavaScript os pontos de quebra do
 Tailwind já usados: 3/4/5/6 colunas), e cada linha usa a mesma grelha

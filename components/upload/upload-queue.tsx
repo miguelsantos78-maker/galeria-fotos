@@ -34,12 +34,7 @@ const FALLBACK_PREVIEW =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' fill='%23e5e0da'/%3E%3Cpath d='M8 34l9-11 7 8 5-6 11 9v2H8z' fill='%23b8ada0'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23b8ada0'/%3E%3C/svg%3E";
 
 type QueueStatus =
-  | "optimizing"
-  | "queued"
-  | "uploading"
-  | "done"
-  | "error"
-  | "canceled";
+  "optimizing" | "queued" | "uploading" | "done" | "error" | "canceled";
 
 interface QueueItem {
   id: string;
@@ -326,7 +321,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
           {items.map((item) => (
             <li
               key={item.id}
-              className="bg-surface-muted rounded-md relative h-16 w-16 shrink-0 overflow-hidden"
+              className="bg-surface-muted relative h-16 w-16 shrink-0 overflow-hidden rounded-md"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- pré-visualização local via URL.createObjectURL, nunca um URL remoto. */}
               <img
@@ -365,7 +360,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
               )}
 
               {item.status === "done" && (
-                <div className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-success">
+                <div className="text-success absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white">
                   <svg
                     aria-hidden="true"
                     viewBox="0 0 20 20"
@@ -396,7 +391,8 @@ export function UploadQueue({ albumId }: { albumId: string }) {
                   frase + botão, por isso a ação (remover) fica no
                   próprio toque no ícone, com o texto completo acessível
                   via aria-label/title. */}
-              {item.status === "error" && item.errorCode === "PHOTO_DUPLICATE" ? (
+              {item.status === "error" &&
+              item.errorCode === "PHOTO_DUPLICATE" ? (
                 <button
                   type="button"
                   onClick={() => handleDismiss(item.id)}

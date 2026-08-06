@@ -55,8 +55,7 @@ uma repetição.
 A secção 14 lista os dois endpoints separadamente. Implementados como:
 `POST .../uploads` valida autorização/limite e cria um `upload_jobs`
 (`status: 'pending'`); `POST .../uploads/[uploadId]/complete` recebe os
-bytes (multipart/form-data), revalida tudo outra vez (secção 5.2, passo
-6) e faz Drive + processamento + Storage + `photos` de forma síncrona,
+bytes (multipart/form-data), revalida tudo outra vez (secção 5.2, passo 6) e faz Drive + processamento + Storage + `photos` de forma síncrona,
 num único pedido. A secção 12 já previa esta simplificação: "Se a
 primeira versão técnica usar streaming simples, manter a abstração e
 abrir uma tarefa explícita para completar o modo retomável antes de

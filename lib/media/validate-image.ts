@@ -1,7 +1,10 @@
 import "server-only";
 import { fileTypeFromBuffer } from "file-type";
 import { AppError } from "@/lib/api/response";
-import { ALLOWED_IMAGE_MIME_TYPES, type AllowedImageMimeType } from "./constants";
+import {
+  ALLOWED_IMAGE_MIME_TYPES,
+  type AllowedImageMimeType,
+} from "./constants";
 
 /**
  * Nunca confia no nome, extensão ou MIME enviados pelo cliente (secção
@@ -25,8 +28,6 @@ export async function detectImageMimeType(
   return detected.mime;
 }
 
-function isAllowedImageMimeType(
-  mime: string,
-): mime is AllowedImageMimeType {
+function isAllowedImageMimeType(mime: string): mime is AllowedImageMimeType {
   return (ALLOWED_IMAGE_MIME_TYPES as readonly string[]).includes(mime);
 }

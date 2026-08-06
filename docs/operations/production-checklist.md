@@ -101,16 +101,16 @@ implantação, para não se repetirem:
 Gerar/reunir e guardar num gestor de segredos (Google Secret Manager,
 recomendado para o Cloud Run — nunca em ficheiros `.env` commitados):
 
-| Variável | Como gerar |
-|---|---|
-| `APP_ENCRYPTION_KEY` | 32 bytes aleatórios, ex.: `openssl rand -hex 32` (usar só os primeiros 32 carateres se precisar de string, mas confirmar `>= 32 bytes`) |
-| `APP_TOKEN_PEPPER` | `openssl rand -hex 32` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Painel do Supabase |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | Google Cloud Console |
-| `ADMIN_EMAILS` | Lista separada por vírgulas dos primeiros administradores (secção 6.1) — só necessário até o primeiro admin ter `profiles.role = 'admin'` |
-| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Opcionais, mas fortemente recomendados em produção — sem eles, o rate limiting (secção 15, `lib/security/rate-limit.ts`) fica desligado |
-| `SENTRY_DSN` | Opcional (secção 18) |
-| `CRON_SECRET` | `openssl rand -hex 32` — protege `/api/cron/sync-drive-deletions` (ver secção 0 acima); sem esta variável a sincronização com eliminações no Drive fica desligada |
+| Variável                                              | Como gerar                                                                                                                                                        |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_ENCRYPTION_KEY`                                  | 32 bytes aleatórios, ex.: `openssl rand -hex 32` (usar só os primeiros 32 carateres se precisar de string, mas confirmar `>= 32 bytes`)                           |
+| `APP_TOKEN_PEPPER`                                    | `openssl rand -hex 32`                                                                                                                                            |
+| `SUPABASE_SERVICE_ROLE_KEY`                           | Painel do Supabase                                                                                                                                                |
+| `GOOGLE_OAUTH_CLIENT_SECRET`                          | Google Cloud Console                                                                                                                                              |
+| `ADMIN_EMAILS`                                        | Lista separada por vírgulas dos primeiros administradores (secção 6.1) — só necessário até o primeiro admin ter `profiles.role = 'admin'`                         |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Opcionais, mas fortemente recomendados em produção — sem eles, o rate limiting (secção 15, `lib/security/rate-limit.ts`) fica desligado                           |
+| `SENTRY_DSN`                                          | Opcional (secção 18)                                                                                                                                              |
+| `CRON_SECRET`                                         | `openssl rand -hex 32` — protege `/api/cron/sync-drive-deletions` (ver secção 0 acima); sem esta variável a sincronização com eliminações no Drive fica desligada |
 
 Nunca reutilizar `APP_ENCRYPTION_KEY`/`APP_TOKEN_PEPPER` entre
 desenvolvimento e produção. Rodar `APP_ENCRYPTION_KEY` implica

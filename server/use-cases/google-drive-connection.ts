@@ -15,13 +15,16 @@ import { AppError } from "@/lib/api/response";
 import type { Database } from "@/lib/db/database.types";
 import type { Auth } from "googleapis";
 
-type GoogleConnectionRow = Database["public"]["Tables"]["google_connections"]["Row"];
+type GoogleConnectionRow =
+  Database["public"]["Tables"]["google_connections"]["Row"];
 
 interface ConnectionDeps {
   connections: GoogleConnectionsRepository;
   auditLog: AuditLogRepository;
   /** Injetável para testes ("adaptador mock" — secção 19/22). */
-  driveProviderFactory?: (authClient: Auth.OAuth2Client) => DriveStorageProvider;
+  driveProviderFactory?: (
+    authClient: Auth.OAuth2Client,
+  ) => DriveStorageProvider;
 }
 
 export async function initiateGoogleDriveConnection(options?: {
@@ -48,9 +51,14 @@ export async function completeGoogleDriveConnection(
   ctx: { ownerId: string },
   deps: ConnectionDeps,
 ): Promise<GoogleConnectionRow> {
-  const { refreshToken } = await exchangeAuthorizationCode(params.code, params.codeVerifier);
+  const { refreshToken } = await exchangeAuthorizationCode(
+    params.code,
+    params.codeVerifier,
+  );
   const authClient = createAuthenticatedClient(refreshToken);
-  const provider = (deps.driveProviderFactory ?? createDriveStorageProvider)(authClient);
+  const provider = (deps.driveProviderFactory ?? createDriveStorageProvider)(
+    authClient,
+  );
 
   const health = await provider.verifyConnection();
   if (!health.ok) {
@@ -77,15 +85,25 @@ export async function completeGoogleDriveConnection(
     : await deps.connections.insert({ user_id: ctx.ownerId, ...patch });
 
   if (!baseRow) {
-    throw new AppError("GOOGLE_CONNECTION_SAVE_FAILED", "Não foi possível guardar a ligação.", 500);
+    throw new AppError(
+      "GOOGLE_CONNECTION_SAVE_FAILED",
+      "Não foi possível guardar a ligação.",
+      500,
+    );
   }
 
-  const { folderId } = await provider.ensureRootFolder({ connectionId: baseRow.id });
-  const finalRow = await deps.connections.update(baseRow.id, { root_folder_id: folderId });
+  const { folderId } = await provider.ensureRootFolder({
+    connectionId: baseRow.id,
+  });
+  const finalRow = await deps.connections.update(baseRow.id, {
+    root_folder_id: folderId,
+  });
 
   await deps.auditLog.record({
     actor_user_id: ctx.ownerId,
-    action: existing ? "google_connection.reconnected" : "google_connection.connected",
+    action: existing
+      ? "google_connection.reconnected"
+      : "google_connection.connected",
     metadata: { connectionId: baseRow.id, accountEmail: health.accountEmail },
   });
 
@@ -99,7 +117,11 @@ export async function disconnectGoogleDriveConnection(
 ): Promise<void> {
   const connection = await deps.connections.findById(connectionId);
   if (!connection || connection.user_id !== ownerId) {
-    throw new AppError("GOOGLE_CONNECTION_NOT_FOUND", "Ligação não encontrada.", 404);
+    throw new AppError(
+      "GOOGLE_CONNECTION_NOT_FOUND",
+      "Ligação não encontrada.",
+      404,
+    );
   }
 
   const refreshToken = decryptSecret(
@@ -125,7 +147,11 @@ export async function verifyGoogleDriveConnection(
 ): Promise<GoogleConnectionRow> {
   const connection = await deps.connections.findById(connectionId);
   if (!connection || connection.user_id !== ownerId) {
-    throw new AppError("GOOGLE_CONNECTION_NOT_FOUND", "Ligação não encontrada.", 404);
+    throw new AppError(
+      "GOOGLE_CONNECTION_NOT_FOUND",
+      "Ligação não encontrada.",
+      404,
+    );
   }
 
   const refreshToken = decryptSecret(
@@ -133,7 +159,9 @@ export async function verifyGoogleDriveConnection(
     connection.token_key_version,
   );
   const authClient = createAuthenticatedClient(refreshToken);
-  const provider = (deps.driveProviderFactory ?? createDriveStorageProvider)(authClient);
+  const provider = (deps.driveProviderFactory ?? createDriveStorageProvider)(
+    authClient,
+  );
   const health = await provider.verifyConnection();
 
   const updated = await deps.connections.update(connectionId, {

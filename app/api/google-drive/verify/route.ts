@@ -17,17 +17,23 @@ export async function POST(request: Request) {
 
   try {
     const profile = await requireAdminApi();
-    const body = (await request.json().catch(() => null)) as { connectionId?: unknown } | null;
+    const body = (await request.json().catch(() => null)) as {
+      connectionId?: unknown;
+    } | null;
 
     if (typeof body?.connectionId !== "string" || !body.connectionId) {
       throw new AppError("VALIDATION_ERROR", "connectionId em falta.", 400);
     }
 
     const supabase = createSupabaseAdminClient();
-    const connection = await verifyGoogleDriveConnection(body.connectionId, profile.id, {
-      connections: createGoogleConnectionsRepository(supabase),
-      auditLog: createAuditLogRepository(supabase),
-    });
+    const connection = await verifyGoogleDriveConnection(
+      body.connectionId,
+      profile.id,
+      {
+        connections: createGoogleConnectionsRepository(supabase),
+        auditLog: createAuditLogRepository(supabase),
+      },
+    );
 
     return jsonOk(toPublicGoogleConnection(connection));
   } catch (error) {

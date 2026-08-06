@@ -19,7 +19,9 @@ interface DriveSyncDeps {
   auditLog: AuditLogRepository;
   previewStorage: PreviewStorage;
   /** Injetável para testes ("adaptador mock" — secção 19/22). */
-  driveProviderFactory?: (authClient: Auth.OAuth2Client) => DriveStorageProvider;
+  driveProviderFactory?: (
+    authClient: Auth.OAuth2Client,
+  ) => DriveStorageProvider;
 }
 
 export interface DriveSyncResult {
@@ -63,9 +65,9 @@ export async function syncDeletedDrivePhotos(
         connection.token_key_version,
       );
       const authClient = createAuthenticatedClient(refreshToken);
-      const provider = (deps.driveProviderFactory ?? createDriveStorageProvider)(
-        authClient,
-      );
+      const provider = (
+        deps.driveProviderFactory ?? createDriveStorageProvider
+      )(authClient);
 
       const activePhotoIds = await provider.listActivePhotoIds();
 

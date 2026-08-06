@@ -161,9 +161,7 @@ describe("syncDeletedDrivePhotos", () => {
     const stillThere = await photos.insert(
       makePhotoRow({ album_id: "album-1", status: "ready" }),
     );
-    deps.driveProviderFactory().state.activePhotoIds = new Set([
-      stillThere.id,
-    ]);
+    deps.driveProviderFactory().state.activePhotoIds = new Set([stillThere.id]);
 
     const result = await syncDeletedDrivePhotos(deps);
 

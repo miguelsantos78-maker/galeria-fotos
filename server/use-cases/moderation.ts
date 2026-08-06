@@ -29,7 +29,9 @@ interface ModerationDeps {
   auditLog: AuditLogRepository;
   previewStorage: PreviewStorage;
   /** Injetável para testes ("adaptador mock" — secção 19/22). */
-  driveProviderFactory?: (authClient: Auth.OAuth2Client) => DriveStorageProvider;
+  driveProviderFactory?: (
+    authClient: Auth.OAuth2Client,
+  ) => DriveStorageProvider;
 }
 
 /** Estados a partir dos quais "aprovar/republicar" (→ `ready`) é uma transição válida. */
@@ -159,7 +161,10 @@ export async function updatePhotoModeration(
     updates.moderation_note = patch.moderationNote || null;
   }
 
-  if (patch.isFeatured !== undefined && patch.isFeatured !== photo.is_featured) {
+  if (
+    patch.isFeatured !== undefined &&
+    patch.isFeatured !== photo.is_featured
+  ) {
     updates.is_featured = patch.isFeatured;
     auditActions.push(patch.isFeatured ? "photo.featured" : "photo.unfeatured");
   }

@@ -12,9 +12,7 @@ import { getServerEnv } from "@/lib/env";
  */
 
 export type RateLimitBucket =
-  | "album-resolve"
-  | "upload-initiate"
-  | "upload-complete";
+  "album-resolve" | "upload-initiate" | "upload-complete";
 
 const BUCKET_CONFIG: Record<
   RateLimitBucket,

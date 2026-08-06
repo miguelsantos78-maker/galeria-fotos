@@ -1,9 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/database.types";
 
-type GoogleConnectionRow = Database["public"]["Tables"]["google_connections"]["Row"];
-type GoogleConnectionInsert = Database["public"]["Tables"]["google_connections"]["Insert"];
-type GoogleConnectionUpdate = Database["public"]["Tables"]["google_connections"]["Update"];
+type GoogleConnectionRow =
+  Database["public"]["Tables"]["google_connections"]["Row"];
+type GoogleConnectionInsert =
+  Database["public"]["Tables"]["google_connections"]["Insert"];
+type GoogleConnectionUpdate =
+  Database["public"]["Tables"]["google_connections"]["Update"];
 
 export interface GoogleConnectionsRepository {
   findActiveByUser(userId: string): Promise<GoogleConnectionRow | null>;
@@ -13,7 +16,10 @@ export interface GoogleConnectionsRepository {
    * sincronização periódica (`server/use-cases/drive-sync.ts`). */
   listAllActive(): Promise<GoogleConnectionRow[]>;
   insert(input: GoogleConnectionInsert): Promise<GoogleConnectionRow>;
-  update(id: string, patch: GoogleConnectionUpdate): Promise<GoogleConnectionRow | null>;
+  update(
+    id: string,
+    patch: GoogleConnectionUpdate,
+  ): Promise<GoogleConnectionRow | null>;
 }
 
 export function createGoogleConnectionsRepository(

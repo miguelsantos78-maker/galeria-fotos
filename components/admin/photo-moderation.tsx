@@ -80,13 +80,10 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
       action: "approve" | "hide" | "delete";
       photoIds: string[];
     }) =>
-      apiFetch<BatchModerationResult>(
-        `/api/albums/${albumId}/photos/batch`,
-        {
-          method: "POST",
-          body: JSON.stringify({ action, photoIds }),
-        },
-      ),
+      apiFetch<BatchModerationResult>(`/api/albums/${albumId}/photos/batch`, {
+        method: "POST",
+        body: JSON.stringify({ action, photoIds }),
+      }),
     onSuccess: () => {
       setSelected(new Set());
       invalidateAll();
@@ -127,8 +124,7 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
     );
   }
 
-  const photos =
-    photosQuery.data?.pages.flatMap((page) => page.photos) ?? [];
+  const photos = photosQuery.data?.pages.flatMap((page) => page.photos) ?? [];
 
   return (
     <section className="flex flex-col gap-4">

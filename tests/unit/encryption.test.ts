@@ -19,9 +19,7 @@ describe("encryptSecret / decryptSecret", () => {
   it("recupera o texto original depois de encriptar", () => {
     const { ciphertext, keyVersion } = encryptSecret("refresh-token-secreto");
 
-    expect(decryptSecret(ciphertext, keyVersion)).toBe(
-      "refresh-token-secreto",
-    );
+    expect(decryptSecret(ciphertext, keyVersion)).toBe("refresh-token-secreto");
   });
 
   it("nunca inclui o texto original no ciphertext", () => {

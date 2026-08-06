@@ -1,6 +1,7 @@
 import type { Database } from "@/lib/db/database.types";
 
-type GoogleConnectionRow = Database["public"]["Tables"]["google_connections"]["Row"];
+type GoogleConnectionRow =
+  Database["public"]["Tables"]["google_connections"]["Row"];
 
 export interface PublicGoogleConnection {
   id: string;

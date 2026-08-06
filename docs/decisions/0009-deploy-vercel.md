@@ -79,14 +79,15 @@ comentário a explicar a origem do número.
 ### 5. `outputFileTracingIncludes` do sharp: aplicado só à rota que precisa, não a `/api/**/*`
 
 A correção do `ERR_DLOPEN_FAILED` do `sharp` (`serverExternalPackages`
-+ `outputFileTracingIncludes`, ver secção "Notas específicas de um
-deploy na Vercel" no checklist de produção) foi aplicada inicialmente
-a todas as rotas de API (`"/api/**/*"`). Isso duplicava os ~18 MB do
-`@img/sharp-libvips-linux-x64` em cada uma das ~20 rotas, e um
-deployment seguinte (só com alterações de UI, sem tocar nesta
-configuração) falhou em "Deploying outputs..." com um erro genérico da
-Vercel — a build do Next.js em si tinha terminado sem problemas
-(confirmado nos Build Logs). Corrigido de duas formas:
+
+- `outputFileTracingIncludes`, ver secção "Notas específicas de um
+  deploy na Vercel" no checklist de produção) foi aplicada inicialmente
+  a todas as rotas de API (`"/api/**/*"`). Isso duplicava os ~18 MB do
+  `@img/sharp-libvips-linux-x64` em cada uma das ~20 rotas, e um
+  deployment seguinte (só com alterações de UI, sem tocar nesta
+  configuração) falhou em "Deploying outputs..." com um erro genérico da
+  Vercel — a build do Next.js em si tinha terminado sem problemas
+  (confirmado nos Build Logs). Corrigido de duas formas:
 
 1. Restringir a chave a só a rota que importa mesmo `sharp` (via
    `lib/media/process-image.ts`, chamado só por

@@ -86,7 +86,8 @@ export function ShareLinksManager({ albumId }: { albumId: string }) {
     },
   });
 
-  const buildGuestUrl = (token: string) => `${window.location.origin}/a/${token}`;
+  const buildGuestUrl = (token: string) =>
+    `${window.location.origin}/a/${token}`;
 
   return (
     <section className="rounded-card border-border bg-surface flex flex-col gap-4 border p-6">
@@ -252,9 +253,8 @@ export function ShareLinksManager({ albumId }: { albumId: string }) {
 
               {isActive && !guestUrl && (
                 <p className="text-foreground/60 text-xs">
-                  Este link foi criado antes de os links ficarem
-                  recuperáveis — revogue e crie um novo para poder
-                  copiá-lo mais tarde.
+                  Este link foi criado antes de os links ficarem recuperáveis —
+                  revogue e crie um novo para poder copiá-lo mais tarde.
                 </p>
               )}
             </li>

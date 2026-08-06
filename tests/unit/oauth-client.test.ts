@@ -42,8 +42,6 @@ describe("buildAuthorizationRequest", () => {
     const withConsent = await buildAuthorizationRequest({ forceConsent: true });
 
     expect(new URL(withoutConsent.url).searchParams.has("prompt")).toBe(false);
-    expect(new URL(withConsent.url).searchParams.get("prompt")).toBe(
-      "consent",
-    );
+    expect(new URL(withConsent.url).searchParams.get("prompt")).toBe("consent");
   });
 });

@@ -95,9 +95,7 @@ describe("google-drive-connection use-cases", () => {
       expect(result.id).toBe(existing.id);
       expect(connections.rows).toHaveLength(1);
       expect(result.status).toBe("active");
-      expect(auditLog.entries[0].action).toBe(
-        "google_connection.reconnected",
-      );
+      expect(auditLog.entries[0].action).toBe("google_connection.reconnected");
     });
 
     it("lança erro quando a verificação junto do Drive falha", async () => {

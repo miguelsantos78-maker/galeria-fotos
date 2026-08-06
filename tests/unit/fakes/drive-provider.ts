@@ -13,7 +13,11 @@ function nextId(prefix: string): string {
 interface FakeDriveState {
   health: ConnectionHealth;
   ensureRootFolderCalls: { connectionId: string }[];
-  createAlbumFolderCalls: { parentFolderId: string; albumId: string; title: string }[];
+  createAlbumFolderCalls: {
+    parentFolderId: string;
+    albumId: string;
+    title: string;
+  }[];
   deletedFileIds: string[];
   originalContentByFileId: Map<string, Buffer>;
   /** IDs devolvidos por `listActivePhotoIds()` — mutável nos testes para
@@ -23,7 +27,10 @@ interface FakeDriveState {
 
 /** Adaptador falso para testes (secção 19/22) — não chama a API real do Google. */
 export function createFakeDriveStorageProvider(
-  overrides: Partial<{ health: ConnectionHealth; activePhotoIds: Set<string> }> = {},
+  overrides: Partial<{
+    health: ConnectionHealth;
+    activePhotoIds: Set<string>;
+  }> = {},
 ): DriveStorageProvider & { state: FakeDriveState } {
   const state: FakeDriveState = {
     health: overrides.health ?? { ok: true, accountEmail: "owner@example.com" },

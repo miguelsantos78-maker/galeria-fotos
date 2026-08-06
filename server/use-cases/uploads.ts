@@ -19,7 +19,10 @@ import type { PreviewStorage } from "@/lib/media/preview-storage";
 import { detectImageMimeType } from "@/lib/media/validate-image";
 import { processImage } from "@/lib/media/process-image";
 import { buildSafeFilename } from "@/lib/media/filenames";
-import { buildPreviewPath, buildThumbnailPath } from "@/lib/media/storage-paths";
+import {
+  buildPreviewPath,
+  buildThumbnailPath,
+} from "@/lib/media/storage-paths";
 import type { Database } from "@/lib/db/database.types";
 
 type AlbumRow = Database["public"]["Tables"]["albums"]["Row"];
@@ -36,7 +39,9 @@ export interface UploadsDeps {
   auditLog: AuditLogRepository;
   previewStorage: PreviewStorage;
   /** Injetável para testes ("adaptador mock" — secção 19/22). */
-  driveProviderFactory?: (authClient: Auth.OAuth2Client) => DriveStorageProvider;
+  driveProviderFactory?: (
+    authClient: Auth.OAuth2Client,
+  ) => DriveStorageProvider;
 }
 
 /**
@@ -47,7 +52,10 @@ export interface UploadsDeps {
  */
 function extractGoogleApiErrorCode(error: unknown): string | number | null {
   if (typeof error !== "object" || error === null) return null;
-  const withCode = error as { code?: string | number; status?: string | number };
+  const withCode = error as {
+    code?: string | number;
+    status?: string | number;
+  };
   return withCode.code ?? withCode.status ?? null;
 }
 

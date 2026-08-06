@@ -65,7 +65,11 @@ describe("uploads use-cases", () => {
       const uploadJobs = createFakeUploadJobsRepository();
 
       const result = await initiateUpload(
-        { clientUploadId: "client-1", filename: "foto.jpg", expectedSize: 1000 },
+        {
+          clientUploadId: "client-1",
+          filename: "foto.jpg",
+          expectedSize: 1000,
+        },
         { albumId: "album-1", userId: "user-1" },
         { albums, sessions, uploadJobs },
       );
@@ -240,7 +244,11 @@ describe("uploads use-cases", () => {
 
       await expect(
         completeUpload(
-          { uploadId: secondJob.id, fileBuffer, declaredFilename: "foto-2.jpg" },
+          {
+            uploadId: secondJob.id,
+            fileBuffer,
+            declaredFilename: "foto-2.jpg",
+          },
           { albumId: "album-1", userId: "user-1" },
           deps,
         ),
@@ -256,7 +264,11 @@ describe("uploads use-cases", () => {
 
       await expect(
         completeUpload(
-          { uploadId: "job-inexistente", fileBuffer, declaredFilename: "f.jpg" },
+          {
+            uploadId: "job-inexistente",
+            fileBuffer,
+            declaredFilename: "f.jpg",
+          },
           { albumId: "album-1", userId: "user-1" },
           deps,
         ),
@@ -314,7 +326,15 @@ describe("uploads use-cases", () => {
         completeUpload(
           { uploadId: job.id, fileBuffer, declaredFilename: "f.jpg" },
           { albumId: "album-1", userId: "user-1" },
-          { albums, sessions, connections, uploadJobs, photos, auditLog, previewStorage },
+          {
+            albums,
+            sessions,
+            connections,
+            uploadJobs,
+            photos,
+            auditLog,
+            previewStorage,
+          },
         ),
       ).rejects.toMatchObject({ code: "GOOGLE_DRIVE_NOT_CONNECTED" });
 
@@ -358,7 +378,11 @@ describe("uploads use-cases", () => {
 
       await expect(
         completeUpload(
-          { uploadId: job.id, fileBuffer: Buffer.alloc(0), declaredFilename: "f.jpg" },
+          {
+            uploadId: job.id,
+            fileBuffer: Buffer.alloc(0),
+            declaredFilename: "f.jpg",
+          },
           { albumId: "album-1", userId: "user-1" },
           deps,
         ),

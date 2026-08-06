@@ -16,7 +16,9 @@ interface MediaDeps {
   sessions: AlbumSessionsRepository;
   connections: GoogleConnectionsRepository;
   /** Injetável para testes ("adaptador mock" — secção 19/22). */
-  driveProviderFactory?: (authClient: Auth.OAuth2Client) => DriveStorageProvider;
+  driveProviderFactory?: (
+    authClient: Auth.OAuth2Client,
+  ) => DriveStorageProvider;
 }
 
 export interface OriginalMedia {
@@ -42,10 +44,7 @@ export async function getOriginalForViewer(
     throw new AppError("PHOTO_NOT_FOUND", "Fotografia não encontrada.", 404);
   }
 
-  const session = await deps.sessions.findValidForUser(
-    photo.album_id,
-    userId,
-  );
+  const session = await deps.sessions.findValidForUser(photo.album_id, userId);
   if (!session) {
     throw new AppError(
       "ALBUM_SESSION_INVALID",

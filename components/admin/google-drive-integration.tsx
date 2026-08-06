@@ -19,7 +19,8 @@ export function GoogleDriveIntegration({
 
   const statusQuery = useQuery({
     queryKey: ["google-drive", "status"],
-    queryFn: () => apiFetch<PublicGoogleConnection | null>("/api/google-drive/status"),
+    queryFn: () =>
+      apiFetch<PublicGoogleConnection | null>("/api/google-drive/status"),
   });
 
   const verifyMutation = useMutation({
@@ -66,8 +67,7 @@ export function GoogleDriveIntegration({
       )}
       {notice === "error" && (
         <div className="rounded-card border-danger/30 bg-danger/10 text-foreground border px-4 py-3 text-sm">
-          Não foi possível concluir a ligação ao Google Drive. Tente
-          novamente.
+          Não foi possível concluir a ligação ao Google Drive. Tente novamente.
         </div>
       )}
 
@@ -85,8 +85,8 @@ export function GoogleDriveIntegration({
         {!statusQuery.isLoading && !connection && (
           <>
             <p className="text-foreground/70 text-sm">
-              Ainda não ligou nenhuma conta Google Drive. É necessário ligar
-              uma conta antes de poder criar álbuns.
+              Ainda não ligou nenhuma conta Google Drive. É necessário ligar uma
+              conta antes de poder criar álbuns.
             </p>
             <a
               href="/api/google-drive/connect"
@@ -144,7 +144,9 @@ export function GoogleDriveIntegration({
                 disabled={verifyMutation.isPending}
                 className="border-border text-foreground hover:bg-surface-muted rounded-full border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {verifyMutation.isPending ? "A verificar…" : "Verificar ligação"}
+                {verifyMutation.isPending
+                  ? "A verificar…"
+                  : "Verificar ligação"}
               </button>
 
               <a

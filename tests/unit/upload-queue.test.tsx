@@ -52,7 +52,9 @@ function renderUploadQueue() {
 async function selectFile(name = "foto.jpg") {
   const user = userEvent.setup();
   const file = new File(["conteúdo"], name, { type: "image/jpeg" });
-  const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+  const input = document.querySelector(
+    'input[type="file"]',
+  ) as HTMLInputElement;
   await user.upload(input, file);
   return file;
 }
@@ -65,11 +67,12 @@ beforeEach(() => {
     createObjectURL: vi.fn(() => "blob:mock-url"),
     revokeObjectURL: vi.fn(),
   });
-  vi.spyOn(global, "fetch").mockImplementation(async () =>
-    new Response(
-      JSON.stringify({ data: { uploadId: "upload-1" }, error: null }),
-      { status: 200 },
-    ),
+  vi.spyOn(global, "fetch").mockImplementation(
+    async () =>
+      new Response(
+        JSON.stringify({ data: { uploadId: "upload-1" }, error: null }),
+        { status: 200 },
+      ),
   );
 });
 

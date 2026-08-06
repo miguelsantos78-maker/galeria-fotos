@@ -82,7 +82,15 @@ function setup(
 
 describe("resolveAlbumSession", () => {
   it("cria uma album_session para um token válido", async () => {
-    const { token, albums, shareLinks, sessions, album, photos, createSignedUrls } = setup();
+    const {
+      token,
+      albums,
+      shareLinks,
+      sessions,
+      album,
+      photos,
+      createSignedUrls,
+    } = setup();
 
     const result = await resolveAlbumSession(
       { token },
@@ -109,9 +117,10 @@ describe("resolveAlbumSession", () => {
   });
 
   it("rejeita um link revogado com o mesmo código genérico", async () => {
-    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
-      link: { revoked_at: new Date().toISOString() },
-    });
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup({
+        link: { revoked_at: new Date().toISOString() },
+      });
 
     await expect(
       resolveAlbumSession(
@@ -123,9 +132,10 @@ describe("resolveAlbumSession", () => {
   });
 
   it("rejeita um link expirado", async () => {
-    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
-      link: { expires_at: new Date(Date.now() - 1000).toISOString() },
-    });
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup({
+        link: { expires_at: new Date(Date.now() - 1000).toISOString() },
+      });
 
     await expect(
       resolveAlbumSession(
@@ -137,9 +147,10 @@ describe("resolveAlbumSession", () => {
   });
 
   it("rejeita um álbum que não está publicado", async () => {
-    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
-      album: { status: "draft" },
-    });
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup({
+        album: { status: "draft" },
+      });
 
     await expect(
       resolveAlbumSession(
@@ -151,9 +162,10 @@ describe("resolveAlbumSession", () => {
   });
 
   it("exige PIN quando o link tem um", async () => {
-    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
-      link: { pin_hash: hashPin("1234") },
-    });
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup({
+        link: { pin_hash: hashPin("1234") },
+      });
 
     await expect(
       resolveAlbumSession(
@@ -165,9 +177,10 @@ describe("resolveAlbumSession", () => {
   });
 
   it("rejeita um PIN errado", async () => {
-    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
-      link: { pin_hash: hashPin("1234") },
-    });
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup({
+        link: { pin_hash: hashPin("1234") },
+      });
 
     await expect(
       resolveAlbumSession(
@@ -179,9 +192,10 @@ describe("resolveAlbumSession", () => {
   });
 
   it("aceita o PIN correto", async () => {
-    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
-      link: { pin_hash: hashPin("1234") },
-    });
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup({
+        link: { pin_hash: hashPin("1234") },
+      });
 
     const result = await resolveAlbumSession(
       { token, pin: "1234" },
@@ -193,10 +207,11 @@ describe("resolveAlbumSession", () => {
   });
 
   it("remove a permissão 'upload' quando o álbum tem upload desligado", async () => {
-    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
-      album: { upload_enabled: false },
-      link: { permissions: ["view", "upload"] },
-    });
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup({
+        album: { upload_enabled: false },
+        link: { permissions: ["view", "upload"] },
+      });
 
     const result = await resolveAlbumSession(
       { token },
@@ -208,7 +223,15 @@ describe("resolveAlbumSession", () => {
   });
 
   it("isOwner é true para o dono do álbum autenticado (não anónimo)", async () => {
-    const { token, albums, shareLinks, sessions, album, photos, createSignedUrls } = setup({
+    const {
+      token,
+      albums,
+      shareLinks,
+      sessions,
+      album,
+      photos,
+      createSignedUrls,
+    } = setup({
       album: { owner_id: "owner-1" },
     });
 
@@ -222,7 +245,15 @@ describe("resolveAlbumSession", () => {
   });
 
   it("isOwner é false para um convidado anónimo, mesmo com o mesmo user_id do dono", async () => {
-    const { token, albums, shareLinks, sessions, album, photos, createSignedUrls } = setup({
+    const {
+      token,
+      albums,
+      shareLinks,
+      sessions,
+      album,
+      photos,
+      createSignedUrls,
+    } = setup({
       album: { owner_id: "owner-1" },
     });
 
@@ -236,9 +267,10 @@ describe("resolveAlbumSession", () => {
   });
 
   it("isOwner é false para um utilizador autenticado que não é o dono", async () => {
-    const { token, albums, shareLinks, sessions, photos, createSignedUrls } = setup({
-      album: { owner_id: "owner-1" },
-    });
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup({
+        album: { owner_id: "owner-1" },
+      });
 
     const result = await resolveAlbumSession(
       { token },

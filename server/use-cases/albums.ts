@@ -94,7 +94,9 @@ export async function createAlbumWithDriveFolder(
   ctx: { ownerId: string },
   deps: AlbumsDeps & {
     connections: GoogleConnectionsRepository;
-    driveProviderFactory?: (authClient: Auth.OAuth2Client) => DriveStorageProvider;
+    driveProviderFactory?: (
+      authClient: Auth.OAuth2Client,
+    ) => DriveStorageProvider;
   },
 ): Promise<AlbumRow> {
   const connection = await deps.connections.findActiveByUser(ctx.ownerId);
@@ -119,7 +121,9 @@ export async function createAlbumWithDriveFolder(
     connection.token_key_version,
   );
   const authClient = createAuthenticatedClient(refreshToken);
-  const provider = (deps.driveProviderFactory ?? createDriveStorageProvider)(authClient);
+  const provider = (deps.driveProviderFactory ?? createDriveStorageProvider)(
+    authClient,
+  );
 
   const { folderId } = await provider.createAlbumFolder({
     parentFolderId: connection.root_folder_id,

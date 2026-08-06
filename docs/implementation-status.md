@@ -140,9 +140,9 @@ Limitações conhecidas (detalhe em `docs/decisions/0003`):
 - [x] Orquestração de ligação/reconexão/desconexão/verificação
       (`server/use-cases/google-drive-connection.ts`) e criação de
       álbum com pasta Drive associada
-      (`server/use-cases/albums.ts#createAlbumWithDriveFolder`) — `POST
-      /api/albums` já não recusa com 501, chama o Drive antes de
-      inserir o álbum.
+      (`server/use-cases/albums.ts#createAlbumWithDriveFolder`) —
+      `POST /api/albums` já não recusa com 501, chama o Drive antes
+      de inserir o álbum.
 - [x] UI de administração `/admin/settings/integrations`: estado da
       ligação, ligar, reconectar, verificar, desligar.
 - [x] Adaptador falso para testes (`tests/unit/fakes/drive-provider.ts`),
@@ -246,8 +246,9 @@ Limitações conhecidas (detalhe em `docs/decisions/0005`):
       Drive sem nunca expor tokens/URLs do Google, gated por sessão de
       álbum + `download_enabled`).
 - [x] Primeiro teste de componente da suíte
-      (`tests/unit/lightbox.test.tsx`), usando `@vitest-environment
-      jsdom` por ficheiro (infraestrutura preparada na Fase 4).
+      (`tests/unit/lightbox.test.tsx`), usando
+      `@vitest-environment jsdom` por ficheiro (infraestrutura
+      preparada na Fase 4).
 - [x] `pnpm check` (lint + typecheck + 146 testes) e `pnpm build` a
       passar; migrações validadas com Postgres local + pgTAP (20 testes
       de RLS continuam a passar); verificado manualmente com
@@ -314,8 +315,9 @@ Limitações conhecidas (detalhe em `docs/decisions/0007`):
 
 - [x] Content Security Policy e cabeçalhos de segurança
       (`lib/security/csp.ts`, aplicados em `lib/auth/update-session.ts`
-      a todas as respostas): `frame-ancestors 'none'`, `object-src
-      'none'`, `base-uri`/`form-action 'self'`, `img-src`/`connect-src`
+      a todas as respostas): `frame-ancestors 'none'`,
+      `object-src 'none'`, `base-uri`/`form-action 'self'`,
+      `img-src`/`connect-src`
       limitados ao próprio site e ao host do Supabase configurado,
       `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`,
       `Permissions-Policy`, `Strict-Transport-Security`. CSP com nonce

@@ -31,7 +31,8 @@ export async function buildAuthorizationRequest(options?: {
 }): Promise<AuthorizationRequest> {
   const client = createOAuthClient();
   const state = randomUUID();
-  const { codeVerifier, codeChallenge } = await client.generateCodeVerifierAsync();
+  const { codeVerifier, codeChallenge } =
+    await client.generateCodeVerifierAsync();
 
   const url = client.generateAuthUrl({
     access_type: "offline",
@@ -67,11 +68,16 @@ export async function exchangeAuthorizationCode(
     throw new Error("O Google não devolveu um access token.");
   }
 
-  return { refreshToken: tokens.refresh_token, accessToken: tokens.access_token };
+  return {
+    refreshToken: tokens.refresh_token,
+    accessToken: tokens.access_token,
+  };
 }
 
 /** Cliente OAuth2 já autenticado com o refresh token guardado (desencriptado). */
-export function createAuthenticatedClient(refreshToken: string): Auth.OAuth2Client {
+export function createAuthenticatedClient(
+  refreshToken: string,
+): Auth.OAuth2Client {
   const client = createOAuthClient();
   client.setCredentials({ refresh_token: refreshToken });
   return client;

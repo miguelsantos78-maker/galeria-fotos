@@ -125,8 +125,7 @@ corre em CI e o que precisa de infraestrutura real.
 
 `@axe-core/playwright` (MIT) corre contra `/`, `/admin/login` e a
 página de álbum simulada, com as tags `wcag2a`/`wcag2aa`. Encontrou uma
-violação genuína: o aviso "Ligação em tempo real indisponível" (secção
-11) e três textos semelhantes usavam `text-foreground/50` sobre o fundo
+violação genuína: o aviso "Ligação em tempo real indisponível" (secção 11) e três textos semelhantes usavam `text-foreground/50` sobre o fundo
 claro, dando um contraste de 3.33:1 — abaixo do mínimo de 4.5:1 exigido
 pelo WCAG 2 AA para texto normal (secção 17). Corrigido para
 `text-foreground/70` nesses quatro pontos
