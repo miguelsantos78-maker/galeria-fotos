@@ -203,27 +203,18 @@ describe("Lightbox", () => {
     expect(onDeleted).not.toHaveBeenCalled();
   });
 
-  it("não mostra um botão para ligar/pausar a apresentação", () => {
-    renderLightbox();
-
-    expect(
-      screen.queryByRole("button", { name: "Apresentação" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Pausar apresentação" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("avança automaticamente quando startInPresentationMode é verdadeiro", () => {
+  it("não tem modo apresentação: não avança sozinho nem tem botão para o ligar", () => {
     vi.useFakeTimers();
     try {
-      renderLightbox({ startInPresentationMode: true });
-      expect(screen.getByText("1 / 3")).toBeInTheDocument();
+      renderLightbox();
+      expect(
+        screen.queryByRole("button", { name: /apresenta/i }),
+      ).not.toBeInTheDocument();
 
       act(() => {
-        vi.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(30_000);
       });
-      expect(screen.getByText("2 / 3")).toBeInTheDocument();
+      expect(screen.getByText("1 / 3")).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

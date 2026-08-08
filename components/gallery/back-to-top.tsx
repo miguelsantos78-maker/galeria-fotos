@@ -43,7 +43,7 @@ export function BackToTop() {
         })
       }
       aria-label="Voltar ao topo"
-      className="border-border bg-surface/90 text-foreground hover:bg-surface fixed right-4 bottom-28 z-30 flex h-11 w-11 items-center justify-center rounded-full border shadow-lg backdrop-blur transition-colors sm:bottom-32"
+      className="border-border bg-surface/90 text-foreground hover:bg-surface fixed right-4 bottom-28 z-30 flex h-11 w-11 items-center justify-center rounded-full border shadow-lg backdrop-blur transition active:scale-95 motion-reduce:active:scale-100 sm:bottom-32"
     >
       <svg
         aria-hidden="true"

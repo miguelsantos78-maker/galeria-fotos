@@ -273,12 +273,19 @@ test("mostra o contador e filtra pelas fotografias do próprio convidado", async
 
   await expect(page.getByText("3 fotografias")).toBeVisible();
 
-  const filterButton = page.getByRole("button", { name: "As minhas" });
-  await filterButton.click();
+  // O rótulo do botão descreve a AÇÃO seguinte, por isso troca depois
+  // do clique ("As minhas fotos" → "Todas as fotos").
+  await page.getByRole("button", { name: "As minhas fotos" }).click();
 
   await expect(page.getByText("1 fotografia sua")).toBeVisible();
-  await expect(filterButton).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "Todas as fotos" }),
+  ).toBeVisible();
   await expect(
     page.locator('button:has(img[alt="Fotografia do álbum"])'),
   ).toHaveCount(1);
+
+  // E voltar atrás repõe a lista completa.
+  await page.getByRole("button", { name: "Todas as fotos" }).click();
+  await expect(page.getByText("3 fotografias")).toBeVisible();
 });

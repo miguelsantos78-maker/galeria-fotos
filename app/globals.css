@@ -73,7 +73,15 @@ body {
 
 /* Espaço para a barra de estado / notch / ilha dinâmica e para a barra
    de gestos do sistema, em elementos fixos de ecrã inteiro (cabeçalho
-   fixo, FAB, lightbox) — sem efeito em dispositivos sem essas áreas. */
+   fixo, FAB, lightbox) — sem efeito em dispositivos sem essas áreas.
+
+   ATENÇÃO: estas regras não estão em nenhuma `@layer`, e regras sem
+   camada ganham sempre a regras em camadas — ou seja, ganham a QUALQUER
+   `pt-*`/`pb-*` do Tailwind aplicado ao mesmo elemento, que passa a ser
+   silenciosamente ignorado. Por isso só se usam sozinhas. Quando é
+   preciso somar espaçamento próprio ao inset do sistema, usar um valor
+   explícito no elemento — `pt-[calc(env(safe-area-inset-top)+2.5rem)]` —
+   em vez de juntar as duas coisas. */
 .safe-top {
   padding-top: max(env(safe-area-inset-top), 0px);
 }

@@ -11,8 +11,16 @@ import { useMutation } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
 import type { PublicPhoto } from "@/server/use-cases/photos";
 
-const AUTO_ADVANCE_INTERVAL_MS = 5000;
 const SWIPE_THRESHOLD_PX = 50;
+
+/** Resposta visual ao toque, partilhada por todos os botões do diálogo
+ * (secção 17: não depender só de cor). Num telemóvel não há `hover`, por
+ * isso sem `active:` um toque num botão não dava sinal nenhum de ter
+ * sido registado. `transition` (e não `transition-colors`) para que a
+ * escala seja de facto animada; `motion-reduce:` desliga-a para quem
+ * pediu movimento reduzido. */
+const BUTTON_PRESS =
+  "transition active:scale-95 motion-reduce:active:scale-100";
 
 function getFocusableElements(container: HTMLElement): HTMLElement[] {
   return Array.from(
@@ -39,12 +47,7 @@ const MAX_PHOTOS_FOR_DOTS = 12;
  * dono do álbum (`isOwner`, resolvido no servidor em
  * `resolveAlbumSession` — nunca confiado apenas no cliente: o endpoint
  * `DELETE /api/photos/[photoId]` volta a validar a sessão de
- * administrador e a posse do álbum). O "modo apresentação" (secção
- * 10.1/22) é uma variante do mesmo componente, ligada a partir de
- * fora (`startInPresentationMode`, botão "Apresentação" na grelha) —
- * avança automaticamente enquanto ativa, respeitando
- * `prefers-reduced-motion` (secção 17); não há forma de a pausar sem
- * fechar o diálogo (ADR 0025).
+ * administrador e a posse do álbum).
  *
  * Em vez de um fundo preto sólido a cobrir a página, o diálogo abre
  * sobre a própria galeria com um véu semitransparente desfocado
@@ -58,7 +61,6 @@ export function Lightbox({
   initialIndex,
   downloadEnabled,
   isOwner,
-  startInPresentationMode = false,
   onClose,
   onIndexChange,
   onDeleted,
@@ -67,7 +69,6 @@ export function Lightbox({
   initialIndex: number;
   downloadEnabled: boolean;
   isOwner: boolean;
-  startInPresentationMode?: boolean;
   onClose: () => void;
   onIndexChange?: (photoId: string) => void;
   onDeleted: (photoId: string) => void;
@@ -145,19 +146,6 @@ export function Lightbox({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [goPrev, goNext, onClose]);
 
-  // Modo apresentação: avança automaticamente, exceto com movimento reduzido pedido.
-  useEffect(() => {
-    if (!startInPresentationMode) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setIndex((current) => (current < photos.length - 1 ? current + 1 : 0));
-    }, AUTO_ADVANCE_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [startInPresentationMode, photos.length]);
-
   function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
     touchStartX.current = event.touches[0]?.clientX ?? null;
   }
@@ -187,7 +175,10 @@ export function Lightbox({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="safe-top flex items-center justify-between gap-3 px-4 pt-6 pb-3 sm:pt-8">
+      {/* Espaçamento próprio SOMADO ao inset da barra de estado, em vez
+          de `safe-top` + `pt-*` (ver o aviso em app/globals.css: assim o
+          `pt-*` era ignorado e os controlos ficavam colados ao topo). */}
+      <div className="flex items-center justify-between gap-3 px-4 pt-[calc(env(safe-area-inset-top)+2.5rem)] pb-3 sm:pt-[calc(env(safe-area-inset-top)+3.5rem)]">
         <p className="text-sm text-white/70" aria-live="polite">
           {index + 1} / {photos.length}
         </p>
@@ -197,7 +188,7 @@ export function Lightbox({
           type="button"
           onClick={onClose}
           aria-label="Fechar"
-          className="rounded-full border border-white/30 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/10"
+          className={`rounded-full border border-white/30 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 ${BUTTON_PRESS}`}
         >
           Fechar
         </button>
@@ -244,7 +235,7 @@ export function Lightbox({
             type="button"
             onClick={goPrev}
             aria-label="Fotografia anterior"
-            className="absolute top-1/2 left-2 z-10 -translate-y-1/2 rounded-full border border-white/30 bg-black/20 p-3 text-lg text-white transition-colors hover:bg-white/10 sm:left-4"
+            className={`absolute top-1/2 left-2 z-10 -translate-y-1/2 rounded-full border border-white/30 bg-black/20 p-3 text-lg text-white hover:bg-white/10 sm:left-4 ${BUTTON_PRESS}`}
           >
             ‹
           </button>
@@ -255,14 +246,14 @@ export function Lightbox({
             type="button"
             onClick={goNext}
             aria-label="Próxima fotografia"
-            className="absolute top-1/2 right-2 z-10 -translate-y-1/2 rounded-full border border-white/30 bg-black/20 p-3 text-lg text-white transition-colors hover:bg-white/10 sm:right-4"
+            className={`absolute top-1/2 right-2 z-10 -translate-y-1/2 rounded-full border border-white/30 bg-black/20 p-3 text-lg text-white hover:bg-white/10 sm:right-4 ${BUTTON_PRESS}`}
           >
             ›
           </button>
         )}
       </div>
 
-      <div className="safe-bottom flex flex-col items-center gap-3 px-4 pt-2 pb-4">
+      <div className="flex flex-col items-center gap-3 px-4 pt-2 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
         <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-white/70">
           <span>
             Enviada em {new Date(photo.uploadedAt).toLocaleDateString("pt-PT")}
@@ -272,7 +263,7 @@ export function Lightbox({
             <a
               href={`/api/media/${photo.id}/original`}
               download
-              className="rounded-full border border-white/30 px-4 py-1.5 font-medium text-white transition-colors hover:bg-white/10"
+              className={`inline-block rounded-full border border-white/30 px-4 py-1.5 font-medium text-white hover:bg-white/10 ${BUTTON_PRESS}`}
             >
               Transferir
             </a>
@@ -291,7 +282,7 @@ export function Lightbox({
                 }
               }}
               disabled={deleteMutation.isPending}
-              className="border-danger/60 text-danger rounded-full border px-4 py-1.5 font-medium transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+              className={`border-danger/60 text-danger rounded-full border px-4 py-1.5 font-medium hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60 ${BUTTON_PRESS}`}
             >
               {deleteMutation.isPending ? "A eliminar…" : "Eliminar"}
             </button>

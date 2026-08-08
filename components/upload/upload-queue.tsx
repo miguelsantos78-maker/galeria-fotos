@@ -301,7 +301,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
     // Botão flutuante fixo em baixo, em vez de um campo inline no topo
     // da página — a fila de miniaturas (quando há envios em curso)
     // aparece por cima do botão, dentro do mesmo grupo fixo.
-    <div className="safe-bottom fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-4">
+    <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
       {selectionError && (
         <p
           role="alert"
@@ -422,7 +422,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
                     onClick={() => handleRetry(item.id)}
                     aria-label={`Tentar novamente: ${item.errorMessage}`}
                     title={`${item.errorMessage} — tocar para tentar novamente`}
-                    className="absolute inset-0 flex items-center justify-center bg-black/60"
+                    className="absolute inset-0 flex items-center justify-center bg-black/60 transition active:scale-95 motion-reduce:active:scale-100"
                   >
                     <span
                       role="alert"
@@ -450,7 +450,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
                   type="button"
                   onClick={() => handleCancel(item.id)}
                   aria-label="Cancelar envio"
-                  className="absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white"
+                  className="absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white transition active:scale-90 motion-reduce:active:scale-100"
                 >
                   <svg
                     aria-hidden="true"
@@ -467,7 +467,10 @@ export function UploadQueue({ albumId }: { albumId: string }) {
         </ul>
       )}
 
-      <label className="bg-brand-600 hover:bg-brand-700 flex cursor-pointer items-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold text-white shadow-lg transition-colors">
+      {/* `active:` também responde ao toque num `<label>`, por isso o
+          botão principal ganha o mesmo sinal de clique dos restantes
+          (sem `hover` no telemóvel, era o único sem resposta visual). */}
+      <label className="bg-brand-600 hover:bg-brand-700 flex cursor-pointer items-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold text-white shadow-lg transition active:scale-95 motion-reduce:active:scale-100">
         <svg
           aria-hidden="true"
           viewBox="0 0 20 20"

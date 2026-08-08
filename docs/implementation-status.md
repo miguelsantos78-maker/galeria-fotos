@@ -231,8 +231,9 @@ Limitações conhecidas (detalhe em `docs/decisions/0005`):
       anterior/seguinte, swipe, setas do teclado, `Escape`, foco preso
       no modal, foco devolvido ao fechar, transferir (quando
       `download_enabled`), partilhar link interno (`?photo=<id>`).
-- [x] Modo apresentação como variante do lightbox (avanço automático,
-      respeita `prefers-reduced-motion`).
+- [x] ~~Modo apresentação como variante do lightbox~~ — removido em
+      `docs/decisions/0030` (nunca teve pausa nem controlos e, no
+      telemóvel, era sobretudo um botão a ocupar espaço).
 - [x] Subscrição Realtime (`lib/realtime/use-photos-realtime.ts`):
       `postgres_changes` em `photos` filtrado por `album_id`, nunca
       confia no payload do evento (só invalida e refaz o pedido

@@ -101,8 +101,6 @@ export function PhotoGrid({
   // Só a primeira página traz a contagem (ver `listPhotosForViewer`).
   const totalCount = query.data?.pages[0]?.totalCount ?? null;
 
-  const [presenting, setPresenting] = useState(false);
-
   // A virtualização (abaixo) só pode ligar-se depois de montado no
   // cliente — nunca durante a renderização no servidor, para não
   // arriscar `useWindowVirtualizer` a tocar em `window` nesse passo.
@@ -142,20 +140,12 @@ export function PhotoGrid({
   );
 
   function handleClose() {
-    setPresenting(false);
     updatePhotoParam(null);
   }
 
   function handleDeleted() {
-    setPresenting(false);
     updatePhotoParam(null);
     queryClient.invalidateQueries({ queryKey: ["albums", albumId, "photos"] });
-  }
-
-  function openPresentation() {
-    if (photos.length === 0) return;
-    setPresenting(true);
-    updatePhotoParam(photos[0].id);
   }
 
   if (query.isLoading) {
@@ -194,39 +184,22 @@ export function PhotoGrid({
                 : `${totalCount} ${totalCount === 1 ? "fotografia" : "fotografias"}`)}
           </p>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setOnlyMine((current) => !current)}
-              aria-pressed={onlyMine}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                onlyMine
-                  ? "border-brand-600 bg-brand-600 text-white"
-                  : "border-border text-foreground hover:bg-surface-muted"
-              }`}
-            >
-              As minhas
-            </button>
-
-            {photos.length > 0 && (
-              <button
-                type="button"
-                onClick={openPresentation}
-                aria-label="Iniciar apresentação"
-                className="border-border text-foreground hover:bg-surface-muted inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  className="h-3.5 w-3.5"
-                >
-                  <path d="M6 4.5v11l9-5.5-9-5.5Z" />
-                </svg>
-                Apresentação
-              </button>
-            )}
-          </div>
+          {/* O rótulo descreve a AÇÃO, não o estado atual ("As minhas
+              fotos" → filtra; "Todas as fotos" → volta a mostrar tudo).
+              Por isso não leva `aria-pressed`: um botão de alternância
+              com esse atributo pressupõe um rótulo fixo, e teríamos o
+              estado a ser anunciado duas vezes, de forma contraditória. */}
+          <button
+            type="button"
+            onClick={() => setOnlyMine((current) => !current)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition active:scale-95 motion-reduce:active:scale-100 ${
+              onlyMine
+                ? "border-brand-600 bg-brand-600 text-white"
+                : "border-border text-foreground hover:bg-surface-muted"
+            }`}
+          >
+            {onlyMine ? "Todas as fotos" : "As minhas fotos"}
+          </button>
         </div>
       )}
 
@@ -272,7 +245,7 @@ export function PhotoGrid({
               type="button"
               onClick={() => fetchNextPage()}
               disabled={isFetchingNextPage}
-              className="border-border text-foreground hover:bg-surface-muted mx-auto my-6 rounded-full border px-5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              className="border-border text-foreground hover:bg-surface-muted mx-auto my-6 rounded-full border px-5 py-2 text-sm font-medium transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:active:scale-100"
             >
               {isFetchingNextPage ? "A carregar…" : "Carregar mais"}
             </button>
@@ -290,7 +263,6 @@ export function PhotoGrid({
           initialIndex={openIndex}
           downloadEnabled={downloadEnabled}
           isOwner={isOwner}
-          startInPresentationMode={presenting}
           onClose={handleClose}
           onIndexChange={updatePhotoParam}
           onDeleted={handleDeleted}

@@ -56,34 +56,42 @@ export function AlbumResolver({ token }: { token: string }) {
 
   return (
     <main className="flex flex-1 flex-col">
-      <header className="safe-top px-4 pt-6 sm:px-6 sm:pt-8">
+      {/* Com fotografia de capa, o cabeçalho é de margem a margem (sem
+          padding lateral nem largura máxima) — a fotografia é o
+          elemento de abertura do álbum e ganha em ocupar o ecrã todo.
+          Sem capa, mantém-se o cartão centrado com margens. */}
+      <header
+        className={
+          album.coverPhotoUrl
+            ? "safe-top"
+            : "px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] sm:px-6 sm:pt-[calc(env(safe-area-inset-top)+2rem)]"
+        }
+      >
         {album.coverPhotoUrl ? (
-          <div className="rounded-card border-border mx-auto max-w-2xl overflow-hidden border shadow-md">
-            <div className="relative h-72 sm:h-80">
-              {/* eslint-disable-next-line @next/next/no-img-element -- URL assinado do Supabase Storage, gerado por pedido (secção 5.4); decorativa, o título ao lado já descreve o álbum. */}
-              <img
-                src={album.coverPhotoUrl}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-              <div className="rounded-card border-border/40 bg-surface/60 absolute inset-x-3 bottom-3 border p-5 text-center shadow-lg backdrop-blur-md sm:p-6">
-                <div
-                  aria-hidden="true"
-                  className="mb-4 flex items-center justify-center gap-3"
-                >
-                  <span className="bg-brand-600/40 h-px w-8 sm:w-10" />
-                  <span className="bg-brand-600 h-1.5 w-1.5 rounded-full" />
-                  <span className="bg-brand-600/40 h-px w-8 sm:w-10" />
-                </div>
-                <h1 className="text-foreground font-serif text-2xl font-semibold text-balance sm:text-3xl">
-                  {album.title}
-                </h1>
-                {album.description && (
-                  <p className="text-foreground/80 mx-auto mt-2 max-w-md text-sm text-balance">
-                    {album.description}
-                  </p>
-                )}
+          <div className="relative h-72 w-full sm:h-96">
+            {/* eslint-disable-next-line @next/next/no-img-element -- URL assinado do Supabase Storage, gerado por pedido (secção 5.4); decorativa, o título ao lado já descreve o álbum. */}
+            <img
+              src={album.coverPhotoUrl}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            <div className="rounded-card border-border/40 bg-surface/60 absolute inset-x-3 bottom-3 border p-5 text-center shadow-lg backdrop-blur-md sm:inset-x-6 sm:bottom-6 sm:p-6">
+              <div
+                aria-hidden="true"
+                className="mb-4 flex items-center justify-center gap-3"
+              >
+                <span className="bg-brand-600/40 h-px w-8 sm:w-10" />
+                <span className="bg-brand-600 h-1.5 w-1.5 rounded-full" />
+                <span className="bg-brand-600/40 h-px w-8 sm:w-10" />
               </div>
+              <h1 className="text-foreground font-serif text-2xl font-semibold text-balance sm:text-3xl">
+                {album.title}
+              </h1>
+              {album.description && (
+                <p className="text-foreground/80 mx-auto mt-2 max-w-md text-sm text-balance">
+                  {album.description}
+                </p>
+              )}
             </div>
           </div>
         ) : (
