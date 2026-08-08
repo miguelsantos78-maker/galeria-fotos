@@ -75,14 +75,25 @@ implantação, para não se repetirem:
    desenvolvimento/staging).
 2. Aplicar as migrações por ordem, com a CLI do Supabase ligada ao
    projeto:
+
    ```bash
    supabase link --project-ref <ref-do-projeto>
    supabase db push
    ```
+
    Confirmar que todas as migrações em `supabase/migrations/` (0001 a
-   0006 nesta fase) foram aplicadas — em particular a 0005, que liga
+   0008 nesta fase) foram aplicadas — em particular a 0005, que liga
    `photos` à publicação `supabase_realtime`; sem ela, o tempo real
    (secção 11) fica silenciosamente inativo.
+
+   **Sem a CLI do Supabase à mão?** `docs/operations/migracoes-pendentes.sql`
+   reúne as migrações 0006 a 0008 num único script para colar no SQL
+   Editor do painel. É idempotente (`if not exists`/`if exists` em todas
+   as instruções), por isso é seguro correr sem saber ao certo o que já
+   foi aplicado, e seguro correr mais do que uma vez. Verificado contra
+   um Postgres 16 real: produz exatamente o mesmo esquema que aplicar as
+   migrações 0006, 0007 e 0008 por ordem.
+
 3. Ativar o fornecedor **Google** em Authentication → Sign In / Providers,
    para o login administrativo (secção 6.1) — distinto do OAuth do Drive.
 4. Na mesma página (Authentication → Sign In / Providers), ativar
