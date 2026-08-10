@@ -533,6 +533,15 @@ export function UploadQueue({ albumId }: { albumId: string }) {
           className="sr-only"
         />
       </label>
+
+      {/* Só antes de haver qualquer seleção — depois disso o aviso
+          reativo (`selectionError`) já cobre o limite, e manter os dois
+          em permanência só ocupava espaço por cima da galeria. */}
+      {items.length === 0 && (
+        <p className="text-foreground/60 bg-surface/70 rounded-full px-3 py-1 text-center text-xs shadow-sm backdrop-blur">
+          Máximo de {MAX_FILES} fotografias de cada vez.
+        </p>
+      )}
     </div>
   );
 }

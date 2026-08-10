@@ -83,6 +83,23 @@ afterEach(() => {
 });
 
 describe("UploadQueue", () => {
+  it("mostra o limite de fotografias por envio antes de qualquer seleção", () => {
+    renderUploadQueue();
+
+    expect(
+      screen.getByText("Máximo de 50 fotografias de cada vez."),
+    ).toBeInTheDocument();
+  });
+
+  it("esconde o aviso do limite depois de haver ficheiros selecionados", async () => {
+    renderUploadQueue();
+    await selectFile();
+
+    expect(
+      screen.queryByText("Máximo de 50 fotografias de cada vez."),
+    ).not.toBeInTheDocument();
+  });
+
   it("mostra um botão de tentar novamente para um erro genérico de envio", async () => {
     renderUploadQueue();
     await selectFile();
