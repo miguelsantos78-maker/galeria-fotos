@@ -27,6 +27,15 @@ const SORT_LABELS: Record<SortBy, string> = {
  * arbitrário que encolhe ou cresce quando as fotografias reais chegam. */
 const SKELETON_COUNT = 20;
 
+/** Bem abaixo do máximo de 200 aceite pelo servidor
+ * (`batchModerateSchema`) — cada fotografia numa ação em lote corre
+ * sequencialmente no servidor (secção 16), com pelo menos uma chamada à
+ * API do Drive por fotografia; um único pedido com centenas de
+ * fotografias arriscava ultrapassar o tempo máximo de execução da
+ * função. "Selecionar tudo" num álbum grande divide-se em vários
+ * pedidos deste tamanho, em vez de um só. */
+const BATCH_CHUNK_SIZE = 25;
+
 /** Marcadores em forma de grelha — usados tanto no carregamento inicial
  * como, mais pequenos, enquanto a página seguinte chega (secção 17:
  * loading state, sem depender só de texto para o anunciar). */
@@ -50,6 +59,12 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
   const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState<SortBy>("uploaded_at");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const [bulkFailedCount, setBulkFailedCount] = useState(0);
 
   const queryKey = ["albums", albumId, "photos", "moderation", sortBy];
 
@@ -116,24 +131,6 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
     },
   });
 
-  const batchMutation = useMutation({
-    mutationFn: ({
-      action,
-      photoIds,
-    }: {
-      action: "approve" | "hide" | "delete";
-      photoIds: string[];
-    }) =>
-      apiFetch<BatchModerationResult>(`/api/albums/${albumId}/photos/batch`, {
-        method: "POST",
-        body: JSON.stringify({ action, photoIds }),
-      }),
-    onSuccess: () => {
-      setSelected(new Set());
-      invalidateAll();
-    },
-  });
-
   function toggleSelected(photoId: string) {
     setSelected((current) => {
       const next = new Set(current);
@@ -143,17 +140,75 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
     });
   }
 
-  function runBatch(action: "approve" | "hide" | "delete") {
-    if (selected.size === 0) return;
+  // "Selecionar tudo" tem de carregar primeiro as páginas que ainda
+  // faltarem — senão só selecionava o que já estava montado no ecrã
+  // (20, ou menos). `fetchNextPage()` resolve com o resultado já
+  // atualizado, por isso o ciclo lê sempre `hasNextPage` fresco, em vez
+  // de depender de uma referência de `photosQuery` presa ao momento em
+  // que esta função foi criada.
+  async function selectAllPhotos() {
+    setIsSelectingAll(true);
+    try {
+      let result = photosQuery.hasNextPage
+        ? await photosQuery.fetchNextPage()
+        : undefined;
+      while (result?.hasNextPage) {
+        result = await photosQuery.fetchNextPage();
+      }
+      const allPhotos =
+        (result?.data ?? photosQuery.data)?.pages.flatMap(
+          (page) => page.photos,
+        ) ?? [];
+      setSelected(new Set(allPhotos.map((photo) => photo.id)));
+    } finally {
+      setIsSelectingAll(false);
+    }
+  }
+
+  // Em vez de `useMutation` com um único pedido: uma seleção grande
+  // ("Selecionar tudo" num álbum de centenas de fotografias) divide-se
+  // em pedidos de BATCH_CHUNK_SIZE, correndo um de cada vez — e o
+  // progresso fica visível, em vez de um botão só desativado sem
+  // indicação de quanto falta.
+  async function runBatch(action: "approve" | "hide" | "delete") {
+    const photoIds = Array.from(selected);
+    if (photoIds.length === 0) return;
     if (
       action === "delete" &&
       !window.confirm(
-        `Eliminar ${selected.size} fotografia(s)? Esta ação não pode ser desfeita.`,
+        `Eliminar ${photoIds.length} fotografia(s)? Esta ação não pode ser desfeita.`,
       )
     ) {
       return;
     }
-    batchMutation.mutate({ action, photoIds: Array.from(selected) });
+
+    setBulkFailedCount(0);
+    setBulkProgress({ done: 0, total: photoIds.length });
+    let totalFailed = 0;
+
+    for (let start = 0; start < photoIds.length; start += BATCH_CHUNK_SIZE) {
+      const chunk = photoIds.slice(start, start + BATCH_CHUNK_SIZE);
+      try {
+        const result = await apiFetch<BatchModerationResult>(
+          `/api/albums/${albumId}/photos/batch`,
+          { method: "POST", body: JSON.stringify({ action, photoIds: chunk }) },
+        );
+        totalFailed += result.failed.length;
+      } catch {
+        // Um chunk inteiro a falhar (ex.: rede em baixo a meio) não
+        // pode travar os restantes — conta-se como falhado e continua.
+        totalFailed += chunk.length;
+      }
+      setBulkProgress({
+        done: Math.min(start + chunk.length, photoIds.length),
+        total: photoIds.length,
+      });
+    }
+
+    setBulkFailedCount(totalFailed);
+    setBulkProgress(null);
+    setSelected(new Set());
+    invalidateAll();
   }
 
   if (photosQuery.isLoading) {
@@ -207,15 +262,43 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
         </div>
       </div>
 
+      {/* "Selecionar tudo" fica sempre visível, mesmo sem nenhuma
+          fotografia escolhida — é o próprio ponto de partida para
+          eliminar um álbum inteiro sem marcar caixa a caixa. */}
+      {photos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <button
+            type="button"
+            onClick={selectAllPhotos}
+            disabled={isSelectingAll || bulkProgress !== null}
+            className="text-brand-600 hover:text-brand-700 font-medium underline decoration-dotted underline-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSelectingAll ? "A selecionar tudo…" : "Selecionar tudo"}
+          </button>
+          {selected.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelected(new Set())}
+              disabled={bulkProgress !== null}
+              className="text-foreground/60 hover:text-foreground underline disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Limpar seleção
+            </button>
+          )}
+        </div>
+      )}
+
       {selected.size > 0 && (
         <div className="rounded-card border-border bg-surface-muted flex flex-wrap items-center gap-3 border px-4 py-2.5 text-sm">
           <span className="text-foreground font-medium">
-            {selected.size} selecionada(s)
+            {bulkProgress
+              ? `A processar ${bulkProgress.done} de ${bulkProgress.total}…`
+              : `${selected.size} selecionada(s)`}
           </span>
           <button
             type="button"
             onClick={() => runBatch("approve")}
-            disabled={batchMutation.isPending}
+            disabled={bulkProgress !== null}
             className="border-border text-foreground hover:bg-surface rounded-full border px-3 py-1 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Aprovar
@@ -223,7 +306,7 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
           <button
             type="button"
             onClick={() => runBatch("hide")}
-            disabled={batchMutation.isPending}
+            disabled={bulkProgress !== null}
             className="border-border text-foreground hover:bg-surface rounded-full border px-3 py-1 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Ocultar
@@ -231,25 +314,17 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
           <button
             type="button"
             onClick={() => runBatch("delete")}
-            disabled={batchMutation.isPending}
+            disabled={bulkProgress !== null}
             className="border-danger/40 text-danger hover:bg-danger/10 rounded-full border px-3 py-1 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Eliminar
           </button>
-          <button
-            type="button"
-            onClick={() => setSelected(new Set())}
-            className="text-foreground/60 hover:text-foreground underline"
-          >
-            Limpar seleção
-          </button>
         </div>
       )}
 
-      {batchMutation.data && batchMutation.data.failed.length > 0 && (
+      {bulkFailedCount > 0 && (
         <p role="alert" className="text-danger text-sm">
-          {batchMutation.data.failed.length} fotografia(s) não puderam ser
-          processadas.
+          {bulkFailedCount} fotografia(s) não puderam ser processadas.
         </p>
       )}
 

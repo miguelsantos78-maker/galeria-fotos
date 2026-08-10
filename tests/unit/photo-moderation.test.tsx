@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PhotoModeration } from "@/components/admin/photo-moderation";
 import type { AdminPhotoView } from "@/server/use-cases/admin-photo-view";
@@ -150,5 +151,179 @@ describe("PhotoModeration — carregamento", () => {
     await waitFor(() =>
       expect(screen.getAllByAltText("Fotografia do álbum")).toHaveLength(2),
     );
+  });
+});
+
+describe("PhotoModeration — selecionar tudo e ações em lote", () => {
+  it("'Selecionar tudo' marca todas as fotografias já carregadas", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(global, "fetch").mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            data: {
+              photos: [makePhoto(), makePhoto(), makePhoto()],
+              nextOffset: null,
+            },
+            error: null,
+          }),
+          { status: 200 },
+        ),
+    );
+    renderModeration();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Selecionar tudo" }),
+    );
+
+    expect(await screen.findByText("3 selecionada(s)")).toBeInTheDocument();
+    for (const checkbox of screen.getAllByRole("checkbox")) {
+      expect(checkbox).toBeChecked();
+    }
+  });
+
+  it("'Selecionar tudo' carrega primeiro as páginas em falta", async () => {
+    let moderationCalls = 0;
+    vi.spyOn(global, "fetch").mockImplementation(async (input) => {
+      if (String(input).includes("/photos/moderation")) {
+        moderationCalls += 1;
+        const isFirstPage = moderationCalls === 1;
+        return new Response(
+          JSON.stringify({
+            data: {
+              photos: [makePhoto({ id: `p-${moderationCalls}` })],
+              nextOffset: isFirstPage ? 20 : null,
+            },
+            error: null,
+          }),
+          { status: 200 },
+        );
+      }
+      throw new Error(`unexpected fetch: ${String(input)}`);
+    });
+    const user = userEvent.setup();
+    renderModeration();
+
+    const selectAllButton = await screen.findByRole("button", {
+      name: "Selecionar tudo",
+    });
+    // Só uma fotografia visível antes de clicar — a segunda página
+    // ainda não tinha sido pedida.
+    expect(moderationCalls).toBe(1);
+
+    await user.click(selectAllButton);
+
+    await waitFor(() => expect(moderationCalls).toBe(2));
+    expect(await screen.findByText("2 selecionada(s)")).toBeInTheDocument();
+  });
+
+  it("divide uma seleção grande em pedidos de 25, em vez de um só", async () => {
+    const PHOTO_COUNT = 30;
+    const batchCalls: string[][] = [];
+    vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes("/photos/moderation")) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              photos: Array.from({ length: PHOTO_COUNT }, (_, i) =>
+                makePhoto({ id: `p-${i}` }),
+              ),
+              nextOffset: null,
+            },
+            error: null,
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/photos/batch")) {
+        const body = JSON.parse(init?.body as string) as {
+          photoIds: string[];
+        };
+        batchCalls.push(body.photoIds);
+        return new Response(
+          JSON.stringify({
+            data: { succeeded: body.photoIds, failed: [] },
+            error: null,
+          }),
+          { status: 200 },
+        );
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    const user = userEvent.setup();
+    renderModeration();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Selecionar tudo" }),
+    );
+    await screen.findByText(`${PHOTO_COUNT} selecionada(s)`);
+
+    await user.click(screen.getAllByRole("button", { name: "Ocultar" })[0]);
+
+    // 30 fotografias, chunks de 25: um pedido com 25, outro com 5 — não
+    // um único pedido com as 30 de uma vez.
+    await waitFor(() => expect(batchCalls).toHaveLength(2));
+    expect(batchCalls[0]).toHaveLength(25);
+    expect(batchCalls[1]).toHaveLength(5);
+
+    // No fim, a seleção limpa-se e não fica nenhum aviso de falha.
+    await waitFor(() =>
+      expect(screen.queryByText(/selecionada\(s\)/)).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("soma as falhas de todos os chunks numa única mensagem", async () => {
+    const PHOTO_COUNT = 30;
+    let chunkIndex = 0;
+    vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes("/photos/moderation")) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              photos: Array.from({ length: PHOTO_COUNT }, (_, i) =>
+                makePhoto({ id: `p-${i}` }),
+              ),
+              nextOffset: null,
+            },
+            error: null,
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/photos/batch")) {
+        chunkIndex += 1;
+        const body = JSON.parse(init?.body as string) as {
+          photoIds: string[];
+        };
+        // O primeiro chunk (25 fotografias) falha em 2; o segundo (5)
+        // falha em todas.
+        const failed =
+          chunkIndex === 1
+            ? body.photoIds
+                .slice(0, 2)
+                .map((photoId) => ({ photoId, error: "boom" }))
+            : body.photoIds.map((photoId) => ({ photoId, error: "boom" }));
+        return new Response(
+          JSON.stringify({ data: { succeeded: [], failed }, error: null }),
+          { status: 200 },
+        );
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    const user = userEvent.setup();
+    renderModeration();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Selecionar tudo" }),
+    );
+    await screen.findByText(`${PHOTO_COUNT} selecionada(s)`);
+    await user.click(screen.getAllByRole("button", { name: "Ocultar" })[0]);
+
+    expect(
+      await screen.findByText("7 fotografia(s) não puderam ser processadas."),
+    ).toBeInTheDocument();
   });
 });
