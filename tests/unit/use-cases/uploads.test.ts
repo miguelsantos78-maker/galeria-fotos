@@ -360,6 +360,51 @@ describe("uploads use-cases", () => {
       expect(photos.rows).toHaveLength(0);
     });
 
+    it("marca a ligação como 'error' quando o Google responde invalid_grant", async () => {
+      const { job, deps, driveProvider, uploadJobs, photos, auditLog } =
+        await makeDeps();
+      // Forma real do erro do google-auth-library quando o refresh
+      // token deixou de ser aceite (ver lib/google-drive/errors.ts).
+      driveProvider.state.failNextUploadWith = Object.assign(
+        new Error("invalid_grant"),
+        { response: { data: { error: "invalid_grant" } } },
+      );
+      const fileBuffer = await createTestJpeg();
+
+      await expect(
+        completeUpload(
+          { uploadId: job.id, fileBuffer, declaredFilename: "f.jpg" },
+          { albumId: "album-1", userId: "user-1" },
+          deps,
+        ),
+      ).rejects.toMatchObject({ code: "GOOGLE_CONNECTION_INVALID" });
+
+      // Sem isto o painel continuaria a dizer que a ligação está ativa,
+      // e nada avisaria o administrador de que tem de reconectar.
+      expect(deps.connections.rows[0].status).toBe("error");
+      expect(auditLog.entries.at(-1)?.action).toBe(
+        "google_connection.invalid_grant",
+      );
+      expect(uploadJobs.rows[0].status).toBe("failed");
+      expect(photos.rows).toHaveLength(0);
+    });
+
+    it("mantém a ligação ativa quando a falha do Drive é transitória", async () => {
+      const { job, deps, driveProvider } = await makeDeps();
+      driveProvider.state.failNextUploadWith = new Error("backendError");
+      const fileBuffer = await createTestJpeg();
+
+      await expect(
+        completeUpload(
+          { uploadId: job.id, fileBuffer, declaredFilename: "f.jpg" },
+          { albumId: "album-1", userId: "user-1" },
+          deps,
+        ),
+      ).rejects.toMatchObject({ code: "UPLOAD_DRIVE_FAILED" });
+
+      expect(deps.connections.rows[0].status).toBe("active");
+    });
+
     it("recusa um ficheiro que não é uma imagem suportada", async () => {
       const { job, deps } = await makeDeps();
       const fileBuffer = Buffer.from("não é uma imagem", "utf8");

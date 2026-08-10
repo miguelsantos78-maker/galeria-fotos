@@ -20,6 +20,10 @@ interface FakeDriveState {
   }[];
   deletedFileIds: string[];
   originalContentByFileId: Map<string, Buffer>;
+  /** Quando definido, o próximo `uploadOriginal()` lança este erro em
+   * vez de devolver um ficheiro — para exercitar os caminhos de falha
+   * do Drive (quota, rede, `invalid_grant`). */
+  failNextUploadWith: unknown;
   /** IDs devolvidos por `listActivePhotoIds()` — mutável nos testes para
    * simular fotografias apagadas diretamente no Drive. */
   activePhotoIds: Set<string>;
@@ -38,6 +42,7 @@ export function createFakeDriveStorageProvider(
     createAlbumFolderCalls: [],
     deletedFileIds: [],
     originalContentByFileId: new Map(),
+    failNextUploadWith: undefined,
     activePhotoIds: overrides.activePhotoIds ?? new Set(),
   };
 
@@ -52,6 +57,11 @@ export function createFakeDriveStorageProvider(
       return { folderId: nextId("album-folder") };
     },
     async uploadOriginal({ filename, mimeType }) {
+      if (state.failNextUploadWith !== undefined) {
+        const error = state.failNextUploadWith;
+        state.failNextUploadWith = undefined;
+        throw error;
+      }
       return {
         fileId: nextId("file"),
         name: filename,

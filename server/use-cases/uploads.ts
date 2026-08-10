@@ -14,6 +14,7 @@ import { getServerEnv } from "@/lib/env";
 import { decryptSecret } from "@/lib/security/encryption";
 import { createAuthenticatedClient } from "@/lib/google-drive/oauth-client";
 import { createDriveStorageProvider } from "@/lib/google-drive/drive-provider";
+import { isInvalidGrantError } from "@/lib/google-drive/errors";
 import type { DriveStorageProvider } from "@/lib/google-drive/types";
 import type { PreviewStorage } from "@/lib/media/preview-storage";
 import { detectImageMimeType } from "@/lib/media/validate-image";
@@ -254,6 +255,29 @@ export async function completeUpload(
       driveErrorCode: extractGoogleApiErrorCode(error),
     });
     await deps.uploadJobs.update(job.id, { status: "failed" });
+
+    // `invalid_grant` significa que o refresh token deixou de ser
+    // aceite pelo Google: repetir o envio nunca pode funcionar, e todos
+    // os envios de todos os convidados vão falhar até o administrador
+    // voltar a ligar a conta. Por isso a ligação passa a `error` — é o
+    // estado que o painel de administração mostra como "é necessário
+    // reconectar" — e o convidado recebe uma mensagem que explica que o
+    // problema não é dele nem se resolve a tentar outra vez.
+    if (isInvalidGrantError(error)) {
+      await deps.connections.update(connection.id, { status: "error" });
+      await deps.auditLog.record({
+        actor_user_id: null,
+        album_id: ctx.albumId,
+        action: "google_connection.invalid_grant",
+        metadata: { connectionId: connection.id },
+      });
+      throw new AppError(
+        "GOOGLE_CONNECTION_INVALID",
+        "O envio está indisponível: a ligação ao Google Drive do organizador expirou. Avise o organizador — as fotografias não se perdem, basta voltar a tentar depois de ele reconectar.",
+        503,
+      );
+    }
+
     throw new AppError(
       "UPLOAD_DRIVE_FAILED",
       "Não foi possível enviar a fotografia para o Google Drive.",

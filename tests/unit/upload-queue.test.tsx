@@ -143,4 +143,67 @@ describe("UploadQueue", () => {
 
     expect(screen.queryByAltText("duplicada.jpg")).not.toBeInTheDocument();
   });
+
+  it("mostra a mensagem real do servidor, e não só um ícone", async () => {
+    renderUploadQueue();
+    await selectFile();
+
+    await waitFor(() => expect(FakeXHR.instances).toHaveLength(1));
+    FakeXHR.instances[0].respond(503, {
+      data: null,
+      error: {
+        code: "GOOGLE_CONNECTION_INVALID",
+        message: "A ligação ao Google Drive do organizador expirou.",
+      },
+    });
+
+    // Visível no ecrã, não escondida num `title` — num telemóvel não há
+    // hover, e sem isto o convidado só via um ícone vermelho.
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "A ligação ao Google Drive do organizador expirou.",
+    );
+  });
+
+  it("agrupa numa linha só as falhas com a mesma mensagem", async () => {
+    renderUploadQueue();
+    const user = userEvent.setup();
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    await user.upload(input, [
+      new File(["a"], "a.jpg", { type: "image/jpeg" }),
+      new File(["b"], "b.jpg", { type: "image/jpeg" }),
+    ]);
+
+    await waitFor(() => expect(FakeXHR.instances).toHaveLength(2));
+    for (const instance of FakeXHR.instances) {
+      instance.respond(502, {
+        data: null,
+        error: { code: "UPLOAD_DRIVE_FAILED", message: "Falha no envio." },
+      });
+    }
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("2 fotografias: Falha no envio.");
+    expect(alert.querySelectorAll("p")).toHaveLength(1);
+  });
+
+  // A mensagem do duplicado já é dada na própria miniatura, em tom de
+  // aviso — repeti-la no painel vermelho de falhas contradizia isso.
+  it("não conta duplicados como falhas no painel de erros", async () => {
+    renderUploadQueue();
+    await selectFile();
+
+    await waitFor(() => expect(FakeXHR.instances).toHaveLength(1));
+    FakeXHR.instances[0].respond(409, {
+      data: null,
+      error: { code: "PHOTO_DUPLICATE", message: "Já enviada." },
+    });
+
+    await screen.findByRole("button", {
+      name: "Já enviada para este álbum. Tocar para remover da lista.",
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
 });

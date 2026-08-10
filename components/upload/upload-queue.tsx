@@ -297,6 +297,26 @@ export function UploadQueue({ albumId }: { albumId: string }) {
 
   const doneCount = items.filter((item) => item.status === "done").length;
 
+  // As falhas mostram a mensagem real do servidor, agrupada por
+  // mensagem: sete ficheiros a falhar pela mesma razão são uma linha,
+  // não sete. Sem isto a única forma de saber o que correu mal era
+  // passar o rato por cima da miniatura — impossível num telemóvel, que
+  // é onde a maioria dos convidados envia (secção 10.3: "mensagens de
+  // erro claras por ficheiro"). Duplicados ficam de fora: já têm o seu
+  // próprio tratamento, em tom de aviso, na miniatura.
+  const failureGroups = [
+    ...items
+      .filter(
+        (item) =>
+          item.status === "error" && item.errorCode !== "PHOTO_DUPLICATE",
+      )
+      .reduce((groups, item) => {
+        const message =
+          item.errorMessage ?? "Não foi possível enviar esta fotografia.";
+        return groups.set(message, (groups.get(message) ?? 0) + 1);
+      }, new Map<string, number>()),
+  ];
+
   return (
     // Botão flutuante fixo em baixo, em vez de um campo inline no topo
     // da página — a fila de miniaturas (quando há envios em curso)
@@ -315,6 +335,24 @@ export function UploadQueue({ albumId }: { albumId: string }) {
         {items.length > 0 &&
           `${doneCount} de ${items.length} fotografias enviadas`}
       </div>
+
+      {failureGroups.length > 0 && (
+        <div
+          role="alert"
+          className="rounded-card border-danger/40 bg-surface/95 w-full max-w-md border p-3 shadow-lg backdrop-blur"
+        >
+          {failureGroups.map(([message, count]) => (
+            <p key={message} className="text-foreground/80 text-xs">
+              {count > 1 && (
+                <span className="text-danger font-semibold">
+                  {count} fotografias:{" "}
+                </span>
+              )}
+              {message}
+            </p>
+          ))}
+        </div>
+      )}
 
       {items.length > 0 && (
         <ul className="border-border bg-surface/95 rounded-card flex max-w-full gap-1.5 overflow-x-auto border p-1.5 shadow-lg backdrop-blur">
@@ -424,10 +462,10 @@ export function UploadQueue({ albumId }: { albumId: string }) {
                     title={`${item.errorMessage} — tocar para tentar novamente`}
                     className="absolute inset-0 flex items-center justify-center bg-black/60 transition active:scale-95 motion-reduce:active:scale-100"
                   >
-                    <span
-                      role="alert"
-                      className="bg-danger/80 flex h-7 w-7 items-center justify-center rounded-full text-white"
-                    >
+                    {/* Sem `role="alert"`: quem anuncia a falha é o
+                        painel acima, com a mensagem inteira. Aqui seria
+                        um segundo anúncio, e sem texto nenhum. */}
+                    <span className="bg-danger/80 flex h-7 w-7 items-center justify-center rounded-full text-white">
                       <svg
                         aria-hidden="true"
                         viewBox="0 0 20 20"
