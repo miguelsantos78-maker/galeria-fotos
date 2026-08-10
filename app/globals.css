@@ -54,6 +54,23 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-serif: var(--font-serif-display);
+  /* Entrada suave de fotografias recém-chegadas a uma listagem paginada
+     (painel de administração) — em vez de simplesmente aparecerem de
+     repente entre as já visíveis. Respeita "prefers-reduced-motion"
+     através da regra global mais abaixo, que zera a duração de
+     qualquer animação. */
+  --animate-fade-in: fade-in 0.25s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (prefers-color-scheme: dark) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useInfiniteQuery,
   useMutation,
@@ -21,6 +21,28 @@ const SORT_LABELS: Record<SortBy, string> = {
   captured_at: "Data de captura",
 };
 
+/** Combina com a página de 20 do servidor (`OWNER_PAGE_SIZE` em
+ * `server/use-cases/moderation.ts`) — mostra o número certo de
+ * marcadores enquanto a página seguinte carrega, em vez de um número
+ * arbitrário que encolhe ou cresce quando as fotografias reais chegam. */
+const SKELETON_COUNT = 20;
+
+/** Marcadores em forma de grelha — usados tanto no carregamento inicial
+ * como, mais pequenos, enquanto a página seguinte chega (secção 17:
+ * loading state, sem depender só de texto para o anunciar). */
+function SkeletonTiles({ count }: { count: number }) {
+  return (
+    <ul aria-hidden="true" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {Array.from({ length: count }, (_, index) => (
+        <li
+          key={index}
+          className="bg-surface-muted aspect-square animate-pulse rounded-md"
+        />
+      ))}
+    </ul>
+  );
+}
+
 export function PhotoModeration({ albumId }: { albumId: string }) {
   const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState<SortBy>("uploaded_at");
@@ -37,6 +59,25 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
   });
+
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = photosQuery;
+
+  // Carregamento progressivo (o mesmo padrão de `photo-grid.tsx`): a
+  // sentinela dispara a página seguinte antes de o administrador chegar
+  // ao fim, sem precisar de tocar em "Carregar mais" — que se mantém
+  // como alternativa acessível ao scroll automático.
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || !hasNextPage) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   function invalidateAll() {
     queryClient.invalidateQueries({
@@ -113,7 +154,15 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
   }
 
   if (photosQuery.isLoading) {
-    return <p className="text-foreground/60 text-sm">A carregar…</p>;
+    // A mesma forma da grelha desde o início, em vez de um texto que
+    // depois salta de repente para a grelha — é o que torna a
+    // transição "suave" em vez de um corte seco.
+    return (
+      <section className="flex flex-col gap-4">
+        <h2 className="text-foreground text-lg font-medium">Fotografias</h2>
+        <SkeletonTiles count={SKELETON_COUNT} />
+      </section>
+    );
   }
 
   if (photosQuery.isError) {
@@ -133,7 +182,7 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
           Fotografias{" "}
           <span className="text-foreground/50 text-sm font-normal">
             ({photos.length}
-            {photosQuery.hasNextPage ? "+" : ""})
+            {hasNextPage ? "+" : ""})
           </span>
         </h2>
         <div className="flex items-center gap-2 text-sm">
@@ -210,7 +259,7 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
           {photos.map((photo) => (
             <li
               key={photo.id}
-              className="rounded-card border-border bg-surface flex flex-col gap-2 border p-2"
+              className="rounded-card border-border bg-surface animate-fade-in flex flex-col gap-2 border p-2"
             >
               <div className="relative">
                 <input
@@ -348,14 +397,21 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
         </ul>
       )}
 
-      {photosQuery.hasNextPage && (
+      {isFetchingNextPage && <SkeletonTiles count={4} />}
+
+      {/* Sentinela invisível: dispara a página seguinte um pouco antes
+          de chegar ao fundo. O botão abaixo continua a existir para
+          quem navega por teclado ou prefere não depender do scroll. */}
+      <div ref={sentinelRef} aria-hidden="true" className="h-1" />
+
+      {hasNextPage && (
         <button
           type="button"
-          onClick={() => photosQuery.fetchNextPage()}
-          disabled={photosQuery.isFetchingNextPage}
-          className="border-border text-foreground hover:bg-surface-muted mx-auto rounded-full border px-5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={() => fetchNextPage()}
+          disabled={isFetchingNextPage}
+          className="border-border text-foreground hover:bg-surface-muted mx-auto rounded-full border px-5 py-2 text-sm font-medium transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:active:scale-100"
         >
-          {photosQuery.isFetchingNextPage ? "A carregar…" : "Carregar mais"}
+          {isFetchingNextPage ? "A carregar…" : "Carregar mais"}
         </button>
       )}
     </section>

@@ -56,8 +56,12 @@ async function loadOwnedPhoto(
 }
 
 /** Página por omissão da listagem de administração — ver
- * `OWNER_PAGE_MAX` em `photos-repository.ts` para o teto. */
-const OWNER_PAGE_SIZE = 100;
+ * `OWNER_PAGE_MAX` em `photos-repository.ts` para o teto. Baixo de
+ * propósito (era 100): um álbum de casamento facilmente passa dos 100
+ * envios, e carregar tudo de uma vez custava tempo e dados a cada
+ * abertura do painel. A partir das 20 fotografias, o painel pagina —
+ * ver `components/admin/photo-moderation.tsx`. */
+const OWNER_PAGE_SIZE = 20;
 
 export interface ListPhotosForOwnerResult {
   photos: AdminPhotoView[];
