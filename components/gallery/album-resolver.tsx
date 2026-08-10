@@ -1,6 +1,7 @@
 "use client";
 
 import { ApiRequestError } from "@/lib/api/client";
+import { formatEventDate } from "@/lib/format-date";
 import { UploadQueue } from "@/components/upload/upload-queue";
 import { useResolveAlbum } from "./use-resolve-album";
 import { PinGate } from "./pin-gate";
@@ -87,6 +88,11 @@ export function AlbumResolver({ token }: { token: string }) {
               <h1 className="text-foreground font-serif text-2xl font-semibold text-balance sm:text-3xl">
                 {album.title}
               </h1>
+              {album.eventStartAt && (
+                <p className="text-foreground/70 mt-1 text-xs sm:text-sm">
+                  {formatEventDate(album.eventStartAt)}
+                </p>
+              )}
               {album.description && (
                 <p className="text-foreground/80 mx-auto mt-2 max-w-md text-sm text-balance">
                   {album.description}
@@ -107,6 +113,11 @@ export function AlbumResolver({ token }: { token: string }) {
             <h1 className="text-foreground font-serif text-3xl font-semibold text-balance sm:text-4xl">
               {album.title}
             </h1>
+            {album.eventStartAt && (
+              <p className="text-foreground/70 mt-1.5 text-xs sm:text-sm">
+                {formatEventDate(album.eventStartAt)}
+              </p>
+            )}
             {album.description && (
               <p className="text-foreground/70 mx-auto mt-3 max-w-md text-sm text-balance">
                 {album.description}

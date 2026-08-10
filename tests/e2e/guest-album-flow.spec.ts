@@ -20,8 +20,8 @@ const RESOLVED_ALBUM = {
     visibility: "unlisted",
     uploadEnabled: true,
     downloadEnabled: true,
-    eventStartAt: null,
-    eventEndAt: null,
+    eventStartAt: null as string | null,
+    eventEndAt: null as string | null,
     coverPhotoUrl: null as string | null,
   },
   permissions: ["view", "upload"],
@@ -189,6 +189,42 @@ test("mostra a fotografia de capa quando o álbum tem uma definida", async ({
     .analyze();
 
   expect(results.violations).toEqual([]);
+});
+
+test("mostra a data do evento por baixo do título, quando definida", async ({
+  page,
+}) => {
+  await mockResolve(page, {
+    album: {
+      ...RESOLVED_ALBUM.album,
+      eventStartAt: "2026-08-17T12:00:00.000Z",
+    },
+  });
+  await mockEmptyPhotos(page);
+
+  await page.goto("/a/token-de-teste");
+
+  await expect(
+    page.getByRole("heading", { name: "Casamento da Ana e do João" }),
+  ).toBeVisible();
+  await expect(page.getByText("17 de agosto de 2026")).toBeVisible();
+});
+
+test("não mostra nenhuma data quando o álbum não tem uma definida", async ({
+  page,
+}) => {
+  await mockResolve(page);
+  await mockEmptyPhotos(page);
+
+  await page.goto("/a/token-de-teste");
+
+  await expect(
+    page.getByRole("heading", { name: "Casamento da Ana e do João" }),
+  ).toBeVisible();
+  // Nenhum texto no formato "<dia> de <mês> de <ano>" (formatEventDate)
+  // deve aparecer — sem isso, um álbum sem data mostraria uma linha
+  // vazia ou "Invalid Date" por baixo do título.
+  await expect(page.getByText(/de \d{4}$/)).toHaveCount(0);
 });
 
 test("virtualiza a grelha para álbuns com muitas fotografias, e continua a abrir o lightbox", async ({

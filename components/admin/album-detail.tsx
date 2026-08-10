@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiRequestError } from "@/lib/api/client";
 import { ShareLinksManager } from "@/components/admin/share-links-manager";
 import { PhotoModeration } from "@/components/admin/photo-moderation";
+import { formatEventDate } from "@/lib/format-date";
 import type { Database } from "@/lib/db/database.types";
 
 type AlbumRow = Database["public"]["Tables"]["albums"]["Row"];
@@ -15,11 +16,26 @@ type AlbumRow = Database["public"]["Tables"]["albums"]["Row"];
  * cedo; o servidor volta sempre a validar. */
 const TITLE_MAX_LENGTH = 200;
 
+/** `event_start_at` é um `timestamptz` completo, mas aqui só interessa
+ * o dia (é o que aparece na galeria pública, secção 10.1) — meio-dia
+ * UTC evita que a data mude de um dia para o outro consoante o fuso
+ * horário de quem a vê, sem ter de guardar/mostrar uma hora que não
+ * significa nada para um "dia do evento". */
+function dateInputValueToIso(value: string): string {
+  return new Date(`${value}T12:00:00.000Z`).toISOString();
+}
+
+function isoToDateInputValue(iso: string): string {
+  return iso.slice(0, 10);
+}
+
 export function AlbumDetail({ albumId }: { albumId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
+  const [isEditingDate, setIsEditingDate] = useState(false);
+  const [dateDraft, setDateDraft] = useState("");
 
   const albumQuery = useQuery({
     queryKey: ["albums", albumId],
@@ -64,6 +80,34 @@ export function AlbumDetail({ albumId }: { albumId: string }) {
     const trimmed = titleDraft.trim();
     if (!trimmed || trimmed.length > TITLE_MAX_LENGTH) return;
     renameMutation.mutate(trimmed);
+  }
+
+  // Aparece na galeria pública por baixo do título (secção 10.1) — daí
+  // ser um campo à parte da descrição, e não só mais uma linha de
+  // texto livre.
+  const eventDateMutation = useMutation({
+    mutationFn: (eventStartAt: string | null) =>
+      apiFetch<AlbumRow>(`/api/albums/${albumId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ eventStartAt }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["albums", albumId] });
+      queryClient.invalidateQueries({ queryKey: ["albums"] });
+      setIsEditingDate(false);
+    },
+  });
+
+  function startEditingDate(currentEventStartAt: string | null) {
+    setDateDraft(
+      currentEventStartAt ? isoToDateInputValue(currentEventStartAt) : "",
+    );
+    eventDateMutation.reset();
+    setIsEditingDate(true);
+  }
+
+  function submitDate() {
+    eventDateMutation.mutate(dateDraft ? dateInputValueToIso(dateDraft) : null);
   }
 
   const deleteMutation = useMutation({
@@ -168,6 +212,79 @@ export function AlbumDetail({ albumId }: { albumId: string }) {
           <p className="text-foreground/60 mt-1 text-sm">
             Estado: {album.status}
           </p>
+
+          {isEditingDate ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <input
+                type="date"
+                value={dateDraft}
+                onChange={(event) => setDateDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") submitDate();
+                  if (event.key === "Escape") setIsEditingDate(false);
+                }}
+                autoFocus
+                aria-label="Data do evento"
+                className="border-border bg-surface text-foreground rounded-md border px-2 py-1 text-sm"
+              />
+              <button
+                type="button"
+                onClick={submitDate}
+                disabled={eventDateMutation.isPending}
+                className="bg-brand-600 hover:bg-brand-700 rounded-full px-3.5 py-1.5 text-xs font-medium text-white transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:active:scale-100"
+              >
+                {eventDateMutation.isPending ? "A guardar…" : "Guardar"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditingDate(false)}
+                disabled={eventDateMutation.isPending}
+                className="border-border text-foreground hover:bg-surface-muted rounded-full border px-3.5 py-1.5 text-xs font-medium transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:active:scale-100"
+              >
+                Cancelar
+              </button>
+              {eventDateMutation.isError && (
+                <p role="alert" className="text-danger w-full text-xs">
+                  {eventDateMutation.error instanceof ApiRequestError
+                    ? eventDateMutation.error.message
+                    : "Não foi possível guardar a data."}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <p className="text-foreground/60 text-sm">
+                Data do evento:{" "}
+                {album.event_start_at
+                  ? formatEventDate(album.event_start_at)
+                  : "não definida"}
+              </p>
+              <button
+                type="button"
+                onClick={() => startEditingDate(album.event_start_at)}
+                aria-label={
+                  album.event_start_at
+                    ? "Editar data do evento"
+                    : "Definir data do evento"
+                }
+                title={
+                  album.event_start_at
+                    ? "Editar data"
+                    : "Definir data do evento"
+                }
+                className="text-foreground/50 hover:text-foreground hover:bg-surface-muted rounded-full p-1.5 transition active:scale-90 motion-reduce:active:scale-100"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-3.5 w-3.5"
+                >
+                  <path d="M13.586 3.586a2 2 0 1 1 2.828 2.828l-8.5 8.5a2 2 0 0 1-.878.507l-3 .857a.5.5 0 0 1-.618-.618l.857-3a2 2 0 0 1 .507-.878l8.5-8.5Z" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 gap-2">
           {album.status !== "published" && (

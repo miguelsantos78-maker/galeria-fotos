@@ -35,15 +35,22 @@ function renderAlbumDetail() {
  * parecia funcionar, mas o `invalidateQueries` a seguir refazia o
  * pedido e repunha o título antigo por cima. */
 let serverTitle = INITIAL_TITLE;
+let serverEventStartAt: string | null = null;
 
 beforeEach(() => {
   serverTitle = INITIAL_TITLE;
+  serverEventStartAt = null;
   vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
     if (url.endsWith("/api/albums/album-1") && !url.includes("?")) {
       if (init?.method === "PATCH") {
-        const body = JSON.parse(init.body as string) as { title?: string };
+        const body = JSON.parse(init.body as string) as {
+          title?: string;
+          eventStartAt?: string | null;
+        };
         if (body.title) serverTitle = body.title;
+        if ("eventStartAt" in body)
+          serverEventStartAt = body.eventStartAt ?? null;
       }
       return new Response(
         JSON.stringify({
@@ -52,6 +59,7 @@ beforeEach(() => {
             title: serverTitle,
             description: null,
             status: "published",
+            event_start_at: serverEventStartAt,
           },
           error: null,
         }),
@@ -148,5 +156,82 @@ describe("AlbumDetail — editar nome do álbum", () => {
     await user.clear(screen.getByRole("textbox", { name: "Nome do álbum" }));
 
     expect(screen.getByRole("button", { name: "Guardar" })).toBeDisabled();
+  });
+});
+
+describe("AlbumDetail — data do evento", () => {
+  it("mostra 'não definida' e o botão para a definir quando o álbum não tem data", async () => {
+    renderAlbumDetail();
+
+    expect(
+      await screen.findByText("Data do evento: não definida"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Definir data do evento" }),
+    ).toBeInTheDocument();
+  });
+
+  it("guarda a data escolhida e mostra-a por extenso em português", async () => {
+    const user = userEvent.setup();
+    const fetchSpy = vi.spyOn(global, "fetch");
+    renderAlbumDetail();
+
+    await screen.findByText("Data do evento: não definida");
+    await user.click(
+      screen.getByRole("button", { name: "Definir data do evento" }),
+    );
+
+    const input = screen.getByLabelText("Data do evento");
+    await user.type(input, "2026-08-17");
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+    const patchCall = fetchSpy.mock.calls.find(([, init]) => {
+      const body = (init as RequestInit | undefined)?.body as
+        string | undefined;
+      return (
+        (init as RequestInit | undefined)?.method === "PATCH" &&
+        body?.includes("eventStartAt")
+      );
+    });
+    expect(patchCall).toBeDefined();
+    // Meio-dia UTC, não meia-noite — evita que a data mude de dia
+    // consoante o fuso horário de quem a vê (ver album-detail.tsx).
+    expect(JSON.parse((patchCall?.[1] as RequestInit).body as string)).toEqual({
+      eventStartAt: "2026-08-17T12:00:00.000Z",
+    });
+
+    expect(
+      await screen.findByText("Data do evento: 17 de agosto de 2026"),
+    ).toBeInTheDocument();
+  });
+
+  it("remover a data (campo vazio) envia null", async () => {
+    const user = userEvent.setup();
+    serverEventStartAt = "2026-08-17T12:00:00.000Z";
+    const fetchSpy = vi.spyOn(global, "fetch");
+    renderAlbumDetail();
+
+    await screen.findByText("Data do evento: 17 de agosto de 2026");
+    await user.click(
+      screen.getByRole("button", { name: "Editar data do evento" }),
+    );
+    await user.clear(screen.getByLabelText("Data do evento"));
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+    const patchCall = fetchSpy.mock.calls.find(([, init]) => {
+      const body = (init as RequestInit | undefined)?.body as
+        string | undefined;
+      return (
+        (init as RequestInit | undefined)?.method === "PATCH" &&
+        body?.includes("eventStartAt")
+      );
+    });
+    expect(JSON.parse((patchCall?.[1] as RequestInit).body as string)).toEqual({
+      eventStartAt: null,
+    });
+
+    expect(
+      await screen.findByText("Data do evento: não definida"),
+    ).toBeInTheDocument();
   });
 });
