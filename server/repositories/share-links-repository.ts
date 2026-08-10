@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/database.types";
+import { toPostgrestError } from "@/lib/db/postgrest-error";
 
 type ShareLinkRow = Database["public"]["Tables"]["album_share_links"]["Row"];
 type ShareLinkInsert =
@@ -26,7 +27,7 @@ export function createShareLinksRepository(
         .select("*")
         .single();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -37,7 +38,7 @@ export function createShareLinksRepository(
         .eq("token_hash", tokenHash)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -48,7 +49,7 @@ export function createShareLinksRepository(
         .eq("album_id", albumId)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -60,7 +61,7 @@ export function createShareLinksRepository(
         .eq("album_id", albumId)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -73,7 +74,7 @@ export function createShareLinksRepository(
         .select("*")
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
   };

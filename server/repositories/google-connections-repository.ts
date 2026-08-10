@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/database.types";
+import { toPostgrestError } from "@/lib/db/postgrest-error";
 
 type GoogleConnectionRow =
   Database["public"]["Tables"]["google_connections"]["Row"];
@@ -38,7 +39,7 @@ export function createGoogleConnectionsRepository(
         .limit(1)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -51,7 +52,7 @@ export function createGoogleConnectionsRepository(
         .limit(1)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -62,7 +63,7 @@ export function createGoogleConnectionsRepository(
         .eq("id", id)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -72,7 +73,7 @@ export function createGoogleConnectionsRepository(
         .select("*")
         .eq("status", "active");
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -83,7 +84,7 @@ export function createGoogleConnectionsRepository(
         .select("*")
         .single();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -95,7 +96,7 @@ export function createGoogleConnectionsRepository(
         .select("*")
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
   };

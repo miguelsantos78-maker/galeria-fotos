@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/database.types";
+import { toPostgrestError } from "@/lib/db/postgrest-error";
 
 type AlbumRow = Database["public"]["Tables"]["albums"]["Row"];
 type AlbumInsert = Database["public"]["Tables"]["albums"]["Insert"];
@@ -28,7 +29,7 @@ export function createAlbumsRepository(
         .select("*")
         .single();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -39,7 +40,7 @@ export function createAlbumsRepository(
         .eq("id", id)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -50,7 +51,7 @@ export function createAlbumsRepository(
         .eq("slug", slug)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -61,7 +62,7 @@ export function createAlbumsRepository(
         .eq("owner_id", ownerId)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -73,13 +74,13 @@ export function createAlbumsRepository(
         .select("*")
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
     async delete(id) {
       const { error } = await db.from("albums").delete().eq("id", id);
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
     },
   };
 }

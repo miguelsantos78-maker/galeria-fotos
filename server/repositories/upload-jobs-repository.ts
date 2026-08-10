@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/database.types";
+import { toPostgrestError } from "@/lib/db/postgrest-error";
 
 type UploadJobRow = Database["public"]["Tables"]["upload_jobs"]["Row"];
 type UploadJobInsert = Database["public"]["Tables"]["upload_jobs"]["Insert"];
@@ -38,7 +39,7 @@ export function createUploadJobsRepository(
         .select("*")
         .single();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -49,7 +50,7 @@ export function createUploadJobsRepository(
         .eq("id", id)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -61,7 +62,7 @@ export function createUploadJobsRepository(
         .select("*")
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -73,7 +74,7 @@ export function createUploadJobsRepository(
         .in("status", ["completed", "failed", "expired"])
         .select("id");
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data?.length ?? 0;
     },
 
@@ -86,7 +87,7 @@ export function createUploadJobsRepository(
         .in("album_id", albumIds)
         .eq("status", "failed");
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return count ?? 0;
     },
 
@@ -100,7 +101,7 @@ export function createUploadJobsRepository(
         .order("created_at", { ascending: false })
         .limit(OWNER_LISTING_MAX);
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
   };

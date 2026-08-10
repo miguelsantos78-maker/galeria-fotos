@@ -56,12 +56,29 @@ export function jsonError(
     );
   }
 
+  // `error` nem sempre é uma instância de `Error` — em particular,
+  // `supabase-js`/PostgREST devolve um objeto simples numa falha de
+  // rede (ver lib/db/postgrest-error.ts). `String(objeto)` dá
+  // "[object Object]", que não ajuda ninguém a diagnosticar nada; por
+  // isso o `message` de um objeto sem ser `Error` é extraído à mão em
+  // vez de deixar cair no `String()` genérico.
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "object" &&
+          error !== null &&
+          "message" in error &&
+          typeof (error as { message: unknown }).message === "string"
+        ? (error as { message: string }).message
+        : String(error);
+
   console.error(
     JSON.stringify({
       level: "error",
       requestId,
       message: "unhandled_error",
-      error: error instanceof Error ? error.message : String(error),
+      error: message,
+      errorName: error instanceof Error ? error.name : typeof error,
     }),
   );
 

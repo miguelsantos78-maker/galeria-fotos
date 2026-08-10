@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/database.types";
+import { toPostgrestError } from "@/lib/db/postgrest-error";
 
 type AuditLogInsert = Database["public"]["Tables"]["audit_logs"]["Insert"];
 
@@ -19,7 +20,7 @@ export function createAuditLogRepository(
   return {
     async record(entry) {
       const { error } = await db.from("audit_logs").insert(entry);
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
     },
   };
 }

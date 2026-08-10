@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/database.types";
+import { toPostgrestError } from "@/lib/db/postgrest-error";
 
 type PhotoRow = Database["public"]["Tables"]["photos"]["Row"];
 type PhotoInsert = Database["public"]["Tables"]["photos"]["Insert"];
@@ -86,7 +87,7 @@ export function createPhotosRepository(
         .select("*")
         .single();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -99,7 +100,7 @@ export function createPhotosRepository(
         .is("deleted_at", null)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -110,7 +111,7 @@ export function createPhotosRepository(
         .eq("id", id)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -143,7 +144,7 @@ export function createPhotosRepository(
         .order("sort_order", { ascending: false })
         .limit(limit);
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -166,7 +167,7 @@ export function createPhotosRepository(
 
       const { count, error } = await query;
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return count ?? 0;
     },
 
@@ -178,7 +179,7 @@ export function createPhotosRepository(
         .select("*")
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -199,7 +200,7 @@ export function createPhotosRepository(
         .order("sort_order", { ascending: false })
         .range(offset, offset + pageSize - 1);
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -212,7 +213,7 @@ export function createPhotosRepository(
         .in("album_id", albumIds)
         .is("deleted_at", null);
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -225,7 +226,7 @@ export function createPhotosRepository(
         .in("album_id", albumIds)
         .is("deleted_at", null);
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return count ?? 0;
     },
 
@@ -240,7 +241,7 @@ export function createPhotosRepository(
         .order("uploaded_at", { ascending: false })
         .limit(limit);
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
   };

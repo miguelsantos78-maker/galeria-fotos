@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/database.types";
+import { toPostgrestError } from "@/lib/db/postgrest-error";
 
 type AlbumSessionRow = Database["public"]["Tables"]["album_sessions"]["Row"];
 type AlbumSessionInsert =
@@ -34,7 +35,7 @@ export function createAlbumSessionsRepository(
         .select("*")
         .single();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
 
@@ -45,7 +46,7 @@ export function createAlbumSessionsRepository(
         .eq("share_link_id", shareLinkId)
         .gt("expires_at", new Date().toISOString());
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
     },
 
     async deleteExpiredBefore(olderThan) {
@@ -55,7 +56,7 @@ export function createAlbumSessionsRepository(
         .lt("expires_at", olderThan.toISOString())
         .select("id");
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data?.length ?? 0;
     },
 
@@ -70,7 +71,7 @@ export function createAlbumSessionsRepository(
         .limit(1)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) throw toPostgrestError(error);
       return data;
     },
   };
