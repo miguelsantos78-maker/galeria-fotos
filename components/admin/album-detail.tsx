@@ -89,7 +89,14 @@ export function AlbumDetail({ albumId }: { albumId: string }) {
   const album = albumQuery.data;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-14">
+    // max-w-3xl chegava para o cabeçalho e os links, mas deixava a
+    // grelha de fotografias presa a 3 colunas com uma faixa enorme de
+    // espaço vazio ao lado em ecrãs largos — só essa secção precisa da
+    // largura extra, mas mover só ela não valia a complexidade de dois
+    // contentores; o cabeçalho e os links de partilha continuam
+    // confortáveis num contentor mais largo, por usarem linhas com
+    // `flex-wrap` em vez de texto corrido.
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-14">
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           {isEditingTitle ? (

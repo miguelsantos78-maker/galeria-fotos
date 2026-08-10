@@ -32,7 +32,10 @@ const SKELETON_COUNT = 20;
  * loading state, sem depender só de texto para o anunciar). */
 function SkeletonTiles({ count }: { count: number }) {
   return (
-    <ul aria-hidden="true" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <ul
+      aria-hidden="true"
+      className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
+    >
       {Array.from({ length: count }, (_, index) => (
         <li
           key={index}
@@ -255,7 +258,7 @@ export function PhotoModeration({ albumId }: { albumId: string }) {
           Ainda não há fotografias neste álbum.
         </p>
       ) : (
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {photos.map((photo) => (
             <li
               key={photo.id}
