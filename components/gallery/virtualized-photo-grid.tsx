@@ -5,8 +5,10 @@ import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import type { PublicPhoto } from "@/server/use-cases/photos";
 import { PhotoTile } from "./photo-tile";
 
-/** `gap-0.5` (0.125rem) na grelha CSS — usado para estimar a altura de
- * cada linha antes da primeira medição real (ver `measureElement`). */
+/** `gap-0.5` (0.125rem) na grelha CSS — usado tanto para estimar a
+ * largura de cada coluna (folga entre colunas) como a altura de cada
+ * linha (folga entre linhas, via `pb-0.5` abaixo) antes da primeira
+ * medição real (ver `measureElement`). */
 const GRID_GAP_PX = 2;
 /** `aspect-square` em `photo-tile.tsx`: altura = largura. */
 const HEIGHT_OVER_WIDTH = 1;
@@ -74,11 +76,14 @@ export function VirtualizedPhotoGrid({
     return chunks;
   }, [photos, columns]);
 
+  // + GRID_GAP_PX: cada linha reserva também o espaço da folga vertical
+  // a seguir a ela (ver `pb-0.5` abaixo) — sem isto, a estimativa inicial
+  // (antes da primeira medição real) empilhava as linhas coladas.
   const estimatedRowHeight = useMemo(() => {
     const viewportWidth =
       typeof window === "undefined" ? 360 : window.innerWidth;
     const columnWidth = (viewportWidth - (columns - 1) * GRID_GAP_PX) / columns;
-    return columnWidth * HEIGHT_OVER_WIDTH;
+    return columnWidth * HEIGHT_OVER_WIDTH + GRID_GAP_PX;
   }, [columns]);
 
   // A grelha não começa no topo da janela (cabeçalho, botão de
@@ -103,13 +108,22 @@ export function VirtualizedPhotoGrid({
       {rowVirtualizer.getVirtualItems().map((virtualRow) => {
         const row = rows[virtualRow.index];
         if (!row) return null;
+        // `gap-0.5` só separa colunas dentro da própria linha — cada
+        // linha é o seu próprio grid de uma única fila, por isso não há
+        // "linha seguinte" para o `gap` do CSS Grid criar espaço contra.
+        // `pb-0.5` reproduz a mesma folga vertical que a grelha simples
+        // tem de origem (era esta folga que desaparecia ao passar as 60
+        // fotografias, quando a grelha virtualizada assumia o lugar).
+        // Sem `pb` na última linha, para não sobrar uma folga a mais
+        // antes do que vem a seguir (sentinela/"Carregar mais").
+        const isLastRow = virtualRow.index === rows.length - 1;
 
         return (
           <div
             key={virtualRow.key}
             ref={rowVirtualizer.measureElement}
             data-index={virtualRow.index}
-            className="absolute top-0 left-0 grid w-full grid-cols-3 gap-0.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6"
+            className={`absolute top-0 left-0 grid w-full grid-cols-3 gap-0.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 ${isLastRow ? "" : "pb-0.5"}`}
             style={{
               transform: `translateY(${virtualRow.start - scrollMargin}px)`,
             }}

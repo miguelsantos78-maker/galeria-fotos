@@ -235,6 +235,23 @@ test("virtualiza a grelha para álbuns com muitas fotografias, e continua a abri
   expect(mountedCount).toBeGreaterThan(0);
   expect(mountedCount).toBeLessThan(PHOTO_COUNT);
 
+  // A grelha virtualizada tem de manter a mesma folga vertical entre
+  // linhas que a grelha simples (`gap-0.5`) — regressão real: as linhas
+  // ficavam coladas verticalmente a partir do momento em que a
+  // virtualização assumia o lugar (viewport de 390px = 3 colunas, por
+  // isso o mosaico 2 é o primeiro da segunda linha).
+  // Limiar de 1px, não só "> 0": sem a folga de `pb-0.5` entre linhas
+  // (ver docs/decisions/0033), o intervalo real medido era ~0.3px —
+  // tecnicamente positivo, mas visualmente colado, como no defeito
+  // reportado. 2px (0.125rem) é o valor esperado; alguma tolerância
+  // para sub-pixel rendering.
+  const lastOfFirstRow = await tiles.nth(2).boundingBox();
+  const firstOfSecondRow = await tiles.nth(3).boundingBox();
+  const verticalGap =
+    (firstOfSecondRow?.y ?? 0) -
+    ((lastOfFirstRow?.y ?? 0) + (lastOfFirstRow?.height ?? 0));
+  expect(verticalGap).toBeGreaterThan(1);
+
   await tiles.first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
 });
