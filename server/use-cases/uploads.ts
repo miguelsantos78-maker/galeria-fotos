@@ -108,7 +108,7 @@ export interface InitiateUploadResult {
 export async function initiateUpload(
   input: InitiateUploadInput,
   ctx: { albumId: string; userId: string },
-  deps: Pick<UploadsDeps, "albums" | "sessions" | "uploadJobs">,
+  deps: Pick<UploadsDeps, "albums" | "sessions" | "uploadJobs" | "photos">,
 ): Promise<InitiateUploadResult> {
   await authorizeUpload(ctx.albumId, ctx.userId, deps);
 
@@ -118,6 +118,18 @@ export async function initiateUpload(
       "UPLOAD_FILE_TOO_LARGE",
       "O ficheiro excede o limite permitido.",
       413,
+    );
+  }
+
+  // Verificado aqui, no passo barato, e não em `completeUpload`: chumbar
+  // depois de o ficheiro já ter atravessado a rede e ido para o Drive
+  // seria gastar exatamente aquilo que este limite existe para poupar.
+  const photoCount = await deps.photos.countForAlbumIds([ctx.albumId]);
+  if (photoCount >= env.MAX_PHOTOS_PER_ALBUM) {
+    throw new AppError(
+      "ALBUM_PHOTO_LIMIT_REACHED",
+      "Este álbum atingiu o número máximo de fotografias.",
+      409,
     );
   }
 

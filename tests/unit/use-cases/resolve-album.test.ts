@@ -352,4 +352,71 @@ describe("resolveAlbumSession", () => {
 
     expect(result.album.coverPhotoUrl).toBeNull();
   });
+
+  describe("reaproveitamento da sessão em vigor", () => {
+    it("não cria uma linha nova quando já existe uma sessão válida e igual", async () => {
+      const deps = setup();
+      const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+        deps;
+      const ctx = { userId: "guest-1", isAnonymous: true };
+      const args = { albums, shareLinks, sessions, photos, createSignedUrls };
+
+      // `useResolveAlbum` resolve o link a cada montagem: abrir a
+      // galeria, atualizar a página e saltar para o envio eram três
+      // linhas para descrever o mesmo acesso.
+      await resolveAlbumSession({ token }, ctx, args);
+      await resolveAlbumSession({ token }, ctx, args);
+      await resolveAlbumSession({ token }, ctx, args);
+
+      expect(sessions.rows).toHaveLength(1);
+    });
+
+    it("cria uma sessão nova quando as permissões do link já não são as mesmas", async () => {
+      // Álbum com upload desligado entretanto: a sessão antiga daria
+      // ao convidado mais acesso do que o link atual concede.
+      const first = setup({ link: { permissions: ["view", "upload"] } });
+      const ctx = { userId: "guest-1", isAnonymous: true };
+
+      await resolveAlbumSession({ token: first.token }, ctx, {
+        albums: first.albums,
+        shareLinks: first.shareLinks,
+        sessions: first.sessions,
+        photos: first.photos,
+        createSignedUrls: first.createSignedUrls,
+      });
+      expect(first.sessions.rows[0].permissions).toEqual(["view", "upload"]);
+
+      await first.albums.update(first.album.id, { upload_enabled: false });
+
+      await resolveAlbumSession({ token: first.token }, ctx, {
+        albums: first.albums,
+        shareLinks: first.shareLinks,
+        sessions: first.sessions,
+        photos: first.photos,
+        createSignedUrls: first.createSignedUrls,
+      });
+
+      expect(first.sessions.rows).toHaveLength(2);
+      expect(first.sessions.rows.at(-1)?.permissions).toEqual(["view"]);
+    });
+
+    it("cria sessões separadas para convidados diferentes", async () => {
+      const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+        setup();
+      const args = { albums, shareLinks, sessions, photos, createSignedUrls };
+
+      await resolveAlbumSession(
+        { token },
+        { userId: "guest-1", isAnonymous: true },
+        args,
+      );
+      await resolveAlbumSession(
+        { token },
+        { userId: "guest-2", isAnonymous: true },
+        args,
+      );
+
+      expect(sessions.rows).toHaveLength(2);
+    });
+  });
 });

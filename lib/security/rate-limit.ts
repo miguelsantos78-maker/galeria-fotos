@@ -2,6 +2,7 @@ import "server-only";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { getServerEnv } from "@/lib/env";
+import { logger } from "@/lib/observability/logger";
 
 /**
  * Rate limit por sessão/IP/álbum (secção 15). Sem `UPSTASH_REDIS_REST_URL`/
@@ -32,6 +33,18 @@ function getRedisClient(): Redis | null {
 
   const env = getServerEnv();
   if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
+    // Ficar desligado é aceitável em desenvolvimento, mas em produção é
+    // uma ausência de proteção que ninguém escolheu conscientemente:
+    // sem isto, a única pista de que o rate limit não existe seria não
+    // haver pista nenhuma. Registado uma só vez (o cliente fica
+    // memorizado a `null`), para não encher os logs a cada pedido.
+    if (process.env.NODE_ENV === "production") {
+      logger.warn({
+        operation: "rateLimit.disabled",
+        message:
+          "Rate limiting DESLIGADO: UPSTASH_REDIS_REST_URL/TOKEN não configurados. Nenhum limite de envios, resoluções de link ou tentativas de PIN está a ser aplicado.",
+      });
+    }
     redisClient = null;
     return null;
   }

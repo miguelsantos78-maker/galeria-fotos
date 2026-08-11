@@ -12,6 +12,7 @@ import {
   makeAlbumRow,
   makeAlbumSessionRow,
   makeGoogleConnectionRow,
+  makePhotoRow,
   makeUploadJobRow,
 } from "../fakes/repositories";
 import { createFakeDriveStorageProvider } from "../fakes/drive-provider";
@@ -71,7 +72,7 @@ describe("uploads use-cases", () => {
           expectedSize: 1000,
         },
         { albumId: "album-1", userId: "user-1" },
-        { albums, sessions, uploadJobs },
+        { albums, sessions, uploadJobs, photos: createFakePhotosRepository() },
       );
 
       expect(result.uploadId).toBeTruthy();
@@ -88,7 +89,12 @@ describe("uploads use-cases", () => {
         initiateUpload(
           { clientUploadId: "c", filename: "f.jpg", expectedSize: 100 },
           { albumId: "album-1", userId: "user-1" },
-          { albums, sessions, uploadJobs },
+          {
+            albums,
+            sessions,
+            uploadJobs,
+            photos: createFakePhotosRepository(),
+          },
         ),
       ).rejects.toMatchObject({ code: "ALBUM_UPLOAD_FORBIDDEN" });
     });
@@ -104,7 +110,12 @@ describe("uploads use-cases", () => {
         initiateUpload(
           { clientUploadId: "c", filename: "f.jpg", expectedSize: 100 },
           { albumId: "album-1", userId: "user-1" },
-          { albums, sessions, uploadJobs },
+          {
+            albums,
+            sessions,
+            uploadJobs,
+            photos: createFakePhotosRepository(),
+          },
         ),
       ).rejects.toMatchObject({ code: "ALBUM_UPLOAD_FORBIDDEN" });
     });
@@ -122,7 +133,12 @@ describe("uploads use-cases", () => {
         initiateUpload(
           { clientUploadId: "c", filename: "f.jpg", expectedSize: 100 },
           { albumId: "album-1", userId: "user-1" },
-          { albums, sessions, uploadJobs },
+          {
+            albums,
+            sessions,
+            uploadJobs,
+            photos: createFakePhotosRepository(),
+          },
         ),
       ).rejects.toMatchObject({ code: "ALBUM_UPLOAD_DISABLED" });
     });
@@ -142,9 +158,42 @@ describe("uploads use-cases", () => {
             expectedSize: 999_999_999,
           },
           { albumId: "album-1", userId: "user-1" },
-          { albums, sessions, uploadJobs },
+          {
+            albums,
+            sessions,
+            uploadJobs,
+            photos: createFakePhotosRepository(),
+          },
         ),
       ).rejects.toMatchObject({ code: "UPLOAD_FILE_TOO_LARGE" });
+    });
+
+    it("recusa quando o álbum já atingiu o teto de fotografias", async () => {
+      const albums = createFakeAlbumsRepository([makeBaseAlbum()]);
+      const sessions = createFakeAlbumSessionsRepository([
+        makeAlbumSessionRow({ permissions: ["view", "upload"] }),
+      ]);
+      const uploadJobs = createFakeUploadJobsRepository();
+      const photos = createFakePhotosRepository();
+      process.env.MAX_PHOTOS_PER_ALBUM = "2";
+      resetEnvCacheForTests();
+      for (let i = 0; i < 2; i++) {
+        await photos.insert(
+          makePhotoRow({ album_id: "album-1", status: "ready" }),
+        );
+      }
+
+      await expect(
+        initiateUpload(
+          { clientUploadId: "c", filename: "f.jpg", expectedSize: 100 },
+          { albumId: "album-1", userId: "user-1" },
+          { albums, sessions, uploadJobs, photos },
+        ),
+      ).rejects.toMatchObject({ code: "ALBUM_PHOTO_LIMIT_REACHED" });
+
+      // Recusado antes de criar o upload_job: o ponto do limite é não
+      // gastar nada, nem sequer uma linha na base de dados.
+      expect(uploadJobs.rows).toHaveLength(0);
     });
   });
 

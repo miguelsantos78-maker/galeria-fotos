@@ -34,6 +34,13 @@ export interface ListPhotosForOwnerInput {
  */
 const OWNER_PAGE_MAX = 100;
 
+/**
+ * Tamanho de cada volta em `listForAlbumIds`. Abaixo do teto por
+ * omissão do PostgREST (1000), para a paginação continuar a funcionar
+ * mesmo que esse limite venha a ser configurado mais para baixo.
+ */
+const LIST_ALL_PAGE_SIZE = 500;
+
 export interface PhotosRepository {
   insert(input: PhotoInsert): Promise<PhotoRow>;
   findByAlbumAndSha256(
@@ -207,14 +214,35 @@ export function createPhotosRepository(
     async listForAlbumIds(albumIds) {
       if (albumIds.length === 0) return [];
 
-      const { data, error } = await db
-        .from("photos")
-        .select("*")
-        .in("album_id", albumIds)
-        .is("deleted_at", null);
+      // Paginado à mão porque o PostgREST impõe um teto de linhas por
+      // resposta (`max-rows`, 1000 por omissão no Supabase) e **não
+      // sinaliza** que truncou: uma consulta sem `range` a um álbum com
+      // mais de 1000 fotografias devolvia só as primeiras 1000, sem
+      // erro nenhum. Quem consome isto é a sincronização com o Drive,
+      // que trata ausência como eliminação — uma lista truncada era
+      // exatamente o input que a salvaguarda da ADR 0038 recusa. Melhor
+      // não a truncar de todo.
+      const all: PhotoRow[] = [];
+      let offset = 0;
 
-      if (error) throw toPostgrestError(error);
-      return data;
+      for (;;) {
+        const { data, error } = await db
+          .from("photos")
+          .select("*")
+          .in("album_id", albumIds)
+          .is("deleted_at", null)
+          .order("id", { ascending: true })
+          .range(offset, offset + LIST_ALL_PAGE_SIZE - 1);
+
+        if (error) throw toPostgrestError(error);
+        if (!data || data.length === 0) break;
+
+        all.push(...data);
+        if (data.length < LIST_ALL_PAGE_SIZE) break;
+        offset += LIST_ALL_PAGE_SIZE;
+      }
+
+      return all;
     },
 
     async countForAlbumIds(albumIds) {

@@ -30,6 +30,12 @@ const serverEnvSchema = publicEnvSchema.extend({
 
   MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(4_000_000),
   MAX_FILES_PER_UPLOAD: z.coerce.number().int().positive().default(50),
+  // Teto por álbum. Um casamento com uma centena de convidados chega
+  // facilmente ao milhar de fotografias, por isso o valor por omissão
+  // dá folga larga sobre isso — não é para restringir o uso normal, é
+  // para um cliente descontrolado (ou um envio em ciclo) não conseguir
+  // encher a conta sozinho antes de alguém reparar.
+  MAX_PHOTOS_PER_ALBUM: z.coerce.number().int().positive().default(5000),
   PREVIEW_MAX_EDGE: z.coerce.number().int().positive().default(1600),
   THUMBNAIL_MAX_EDGE: z.coerce.number().int().positive().default(480),
 

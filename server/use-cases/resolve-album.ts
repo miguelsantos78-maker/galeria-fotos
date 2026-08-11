@@ -124,19 +124,44 @@ export async function resolveAlbumSession(
       ? linkExpiresAt.toISOString()
       : sessionExpiresAt.toISOString();
 
-  await deps.sessions.insert({
-    album_id: album.id,
-    user_id: ctx.userId,
-    share_link_id: link.id,
-    permissions,
-    expires_at: expiresAt,
-  });
+  // Reaproveita a sessão em vigor em vez de criar sempre uma nova.
+  // `useResolveAlbum` resolve o link a cada montagem do componente, por
+  // isso cada abertura, atualização de página ou salto entre a galeria
+  // e o envio inseria mais uma linha: com uma centena de convidados ao
+  // longo de um dia, milhares de linhas para descrever um punhado de
+  // acessos reais. Só se insere quando não há nenhuma válida, ou quando
+  // a que existe já não reflete o estado atual — permissões alteradas
+  // entretanto (upload desligado), ou um link diferente do que a
+  // criou, casos em que a sessão antiga deixaria o convidado com mais
+  // acesso do que o link atual concede.
+  const current = await deps.sessions.findValidForUser(album.id, ctx.userId);
+  const isCurrentStillAccurate =
+    current !== null &&
+    current.share_link_id === link.id &&
+    samePermissions(current.permissions, permissions);
+
+  if (!isCurrentStillAccurate) {
+    await deps.sessions.insert({
+      album_id: album.id,
+      user_id: ctx.userId,
+      share_link_id: link.id,
+      permissions,
+      expires_at: expiresAt,
+    });
+  }
 
   return {
     album: toPublicAlbumView(album, coverPhotoUrl),
     permissions,
     isOwner,
   };
+}
+
+/** Igualdade como conjunto: a ordem em que vieram não é significativa. */
+function samePermissions(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  return b.every((permission) => set.has(permission));
 }
 
 function isLinkCurrentlyValid(link: {

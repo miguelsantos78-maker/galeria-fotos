@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from "@/lib/db/supabase-admin";
 import { createAlbumsRepository } from "@/server/repositories/albums-repository";
 import { createAlbumSessionsRepository } from "@/server/repositories/album-sessions-repository";
 import { createUploadJobsRepository } from "@/server/repositories/upload-jobs-repository";
+import { createPhotosRepository } from "@/server/repositories/photos-repository";
 import { initiateUpload } from "@/server/use-cases/uploads";
 import { initiateUploadSchema } from "@/lib/validation/upload";
 import { checkRateLimit } from "@/lib/security/rate-limit";
@@ -59,6 +60,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         albums: createAlbumsRepository(adminClient),
         sessions: createAlbumSessionsRepository(adminClient),
         uploadJobs: createUploadJobsRepository(adminClient),
+        photos: createPhotosRepository(adminClient),
       },
     );
 

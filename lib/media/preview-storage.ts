@@ -14,6 +14,15 @@ export interface PreviewStorage {
   remove(paths: string[]): Promise<void>;
 }
 
+/**
+ * Um ano. Os derivados são imutáveis: o caminho inclui o `photoId`
+ * (`albums/{albumId}/{photoId}/preview.webp`) e o conteúdo desse
+ * caminho nunca é reescrito — reprocessar geraria um `photoId` novo.
+ * Sem isto vale o valor por omissão do Supabase (uma hora), que obriga
+ * o browser a voltar a descarregar miniaturas que não mudaram.
+ */
+const IMMUTABLE_CACHE_SECONDS = 31_536_000;
+
 export function createSupabasePreviewStorage(
   client: SupabaseClient<Database>,
 ): PreviewStorage {
@@ -24,6 +33,7 @@ export function createSupabasePreviewStorage(
       const { error } = await bucket.upload(path, buffer, {
         contentType,
         upsert: false,
+        cacheControl: String(IMMUTABLE_CACHE_SECONDS),
       });
       if (error) throw error;
     },
