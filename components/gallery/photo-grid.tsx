@@ -66,7 +66,6 @@ export function PhotoGrid({
   downloadEnabled: boolean;
   isOwner: boolean;
 }) {
-  const { isConnected } = usePhotosRealtime(albumId);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -100,6 +99,16 @@ export function PhotoGrid({
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
   // Só a primeira página traz a contagem (ver `listPhotosForViewer`).
   const totalCount = query.data?.pages[0]?.totalCount ?? null;
+
+  // Atualizar sozinho só enquanto houver uma página carregada: refazer
+  // uma query paginada refaz TODAS as páginas em cache, por isso o
+  // custo de cada atualização automática cresce com o quanto o
+  // convidado já desceu na galeria. Ver `usePhotosRealtime`.
+  const loadedPageCount = query.data?.pages.length ?? 0;
+  const { isConnected, hasPendingUpdates, refreshNow } = usePhotosRealtime(
+    albumId,
+    { canAutoRefresh: loadedPageCount <= 1 },
+  );
 
   // A virtualização (abaixo) só pode ligar-se depois de montado no
   // cliente — nunca durante a renderização no servidor, para não
@@ -171,6 +180,33 @@ export function PhotoGrid({
         >
           Ligação em tempo real indisponível — a atualizar periodicamente.
         </p>
+      )}
+
+      {/* "Indicador discreto quando entram novas fotografias" (secção
+          10.1). Só aparece a quem já desceu na galeria: aí as
+          fotografias novas não são aplicadas sozinhas, tanto por custo
+          (ver `usePhotosRealtime`) como para a grelha não saltar
+          debaixo do dedo a meio do scroll. Fixo no topo do ecrã, para
+          continuar à mão sem obrigar a voltar atrás. */}
+      {hasPendingUpdates && (
+        <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 flex justify-center px-4">
+          <button
+            type="button"
+            onClick={() => {
+              refreshNow();
+              window.scrollTo({
+                top: 0,
+                behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
+                  .matches
+                  ? "auto"
+                  : "smooth",
+              });
+            }}
+            className="bg-brand-600 hover:bg-brand-700 pointer-events-auto rounded-full px-4 py-2 text-xs font-semibold text-white shadow-lg transition active:scale-95 motion-reduce:active:scale-100"
+          >
+            Há fotografias novas — toque para ver
+          </button>
+        </div>
       )}
 
       {/* A barra de controlos aparece mesmo com a lista vazia quando o

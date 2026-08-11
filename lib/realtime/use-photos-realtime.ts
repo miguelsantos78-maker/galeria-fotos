@@ -1,50 +1,112 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createSupabaseBrowserClient } from "@/lib/db/supabase-browser";
 
-/** Refetch periódico quando o canal não está ligado (secção 11). */
-const FALLBACK_REFETCH_INTERVAL_MS = 15_000;
+/**
+ * Refetch periódico quando o canal não está ligado (secção 11).
+ *
+ * Com desfasamento aleatório (abaixo): sem isso, todos os convidados
+ * que abrissem a galeria por volta da mesma hora — o que num casamento
+ * acontece literalmente — acabariam a sondar em uníssono, concentrando
+ * os pedidos em picos em vez de os espalhar.
+ */
+const FALLBACK_REFETCH_INTERVAL_MS = 30_000;
+const FALLBACK_JITTER_RATIO = 0.25;
 
 /**
- * Espera por uma pausa nos eventos antes de invalidar (secção 16:
- * limites de concorrência) — cada invalidação refaz *todas* as páginas
- * já carregadas de uma consulta paginada (não só a mais recente), para
- * as manter consistentes entre si. Sem isto, uma rajada de envios (ex.:
- * vários convidados a enviar fotos ao mesmo tempo durante o evento)
- * dispararia essa mesma cascata de pedidos uma vez por fotografia; com
- * debounce, uma rajada inteira só provoca uma única invalidação, pouco
- * depois de a rajada abrandar.
+ * Espera por uma pausa nos eventos antes de agir (secção 16: limites de
+ * concorrência) — uma rajada de envios (vários convidados a enviar ao
+ * mesmo tempo durante o evento) provoca uma única reação, pouco depois
+ * de a rajada abrandar, em vez de uma por fotografia.
  */
 const INVALIDATE_DEBOUNCE_MS = 800;
+
+function nextFallbackDelay(): number {
+  const jitter = FALLBACK_REFETCH_INTERVAL_MS * FALLBACK_JITTER_RATIO;
+  return FALLBACK_REFETCH_INTERVAL_MS + (Math.random() * 2 - 1) * jitter;
+}
+
+export interface PhotosRealtimeState {
+  isConnected: boolean;
+  /**
+   * Há alterações por mostrar que não foram aplicadas automaticamente.
+   * A grelha usa isto para o "indicador discreto quando entram novas
+   * fotografias" (secção 10.1).
+   */
+  hasPendingUpdates: boolean;
+  /** Aplica agora o que estiver pendente (o toque no indicador). */
+  refreshNow: () => void;
+}
 
 /**
  * Subscreve `postgres_changes` em `photos`, filtrado por `album_id`
  * (secção 11). Nunca confia no payload do evento — só o usa como sinal
- * para invalidar a query e refazer o pedido autorizado do costume
+ * para refazer o pedido autorizado do costume
  * (`GET /api/albums/[albumId]/photos`), que já replica manualmente a
  * mesma visibilidade da política de RLS. Isto também significa que um
  * `DELETE`, cujo `old record` pode não passar pela verificação de RLS
- * do Realtime, nunca bloqueia a atualização: o próximo refetch (por
- * evento ou pelo fallback periódico) converge sempre para o estado
- * correto.
+ * do Realtime, nunca bloqueia a atualização: o próximo refetch converge
+ * sempre para o estado correto.
+ *
+ * `canAutoRefresh` existe por uma razão de escala medida, não teórica:
+ * invalidar uma query paginada refaz **todas** as páginas já
+ * carregadas, não só a mais recente. Num álbum de 1000 fotografias são
+ * 20 páginas — ou seja, 20 pedidos por cada rajada, por cada convidado
+ * que tenha percorrido a galeria até ao fim. Com uma centena de
+ * convidados, uma única foto nova custava dois mil pedidos.
+ *
+ * Como as fotografias novas entram sempre na primeira página
+ * (`sort_order desc`), refazer as outras dezanove nunca traz nada de
+ * novo. Por isso quem só tem a primeira página carregada continua a ver
+ * as fotos aparecer sozinhas (custo: um pedido); quem já desceu na
+ * galeria recebe o indicador e decide quando atualizar — o que também
+ * evita que a grelha lhe salte debaixo do dedo a meio do scroll.
  */
-export function usePhotosRealtime(albumId: string) {
+export function usePhotosRealtime(
+  albumId: string,
+  options: { canAutoRefresh: boolean },
+): PhotosRealtimeState {
   const queryClient = useQueryClient();
   const [isConnected, setIsConnected] = useState(false);
+  const [hasPendingUpdates, setHasPendingUpdates] = useState(false);
+
+  // Lido de dentro do callback do canal e do temporizador, ambos com
+  // vida mais longa do que a renderização que os criou — uma `ref`
+  // evita ter de voltar a subscrever o canal só porque o número de
+  // páginas carregadas mudou. Atualizada num efeito, e não durante a
+  // renderização: escrever numa ref a meio do render é precisamente o
+  // que torna o valor imprevisível quando o React reexecuta o corpo do
+  // componente.
+  const canAutoRefreshRef = useRef(options.canAutoRefresh);
+  useEffect(() => {
+    canAutoRefreshRef.current = options.canAutoRefresh;
+  }, [options.canAutoRefresh]);
+
+  const refreshNow = useCallback(() => {
+    setHasPendingUpdates(false);
+    void queryClient.invalidateQueries({
+      queryKey: ["albums", albumId, "photos"],
+    });
+  }, [albumId, queryClient]);
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
     let isMounted = true;
     let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
-    const invalidate = () => {
+    const onChange = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        void queryClient.invalidateQueries({
-          queryKey: ["albums", albumId, "photos"],
-        });
+        if (!isMounted) return;
+        if (canAutoRefreshRef.current) {
+          void queryClient.invalidateQueries({
+            queryKey: ["albums", albumId, "photos"],
+          });
+        } else {
+          setHasPendingUpdates(true);
+        }
       }, INVALIDATE_DEBOUNCE_MS);
     };
 
@@ -58,7 +120,7 @@ export function usePhotosRealtime(albumId: string) {
           table: "photos",
           filter: `album_id=eq.${albumId}`,
         },
-        invalidate,
+        onChange,
       )
       .subscribe((status) => {
         if (!isMounted) return;
@@ -72,17 +134,27 @@ export function usePhotosRealtime(albumId: string) {
     };
   }, [albumId, queryClient]);
 
+  // Fallback por sondagem enquanto o canal não estiver ligado. Usa
+  // `setTimeout` reagendado (e não `setInterval`) porque cada espera
+  // tem uma duração diferente, por causa do desfasamento aleatório.
   useEffect(() => {
     if (isConnected) return;
 
-    const interval = setInterval(() => {
-      void queryClient.invalidateQueries({
-        queryKey: ["albums", albumId, "photos"],
-      });
-    }, FALLBACK_REFETCH_INTERVAL_MS);
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      if (canAutoRefreshRef.current) {
+        void queryClient.invalidateQueries({
+          queryKey: ["albums", albumId, "photos"],
+        });
+      } else {
+        setHasPendingUpdates(true);
+      }
+      timer = setTimeout(tick, nextFallbackDelay());
+    };
 
-    return () => clearInterval(interval);
+    timer = setTimeout(tick, nextFallbackDelay());
+    return () => clearTimeout(timer);
   }, [isConnected, albumId, queryClient]);
 
-  return { isConnected };
+  return { isConnected, hasPendingUpdates, refreshNow };
 }

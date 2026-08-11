@@ -24,11 +24,76 @@ interface DriveSyncDeps {
   ) => DriveStorageProvider;
 }
 
+/**
+ * Proporção máxima do álbum que uma única sincronização pode remover.
+ * Acima disto, a passagem é recusada por inteiro (ver `assessRemoval`).
+ */
+const MAX_REMOVAL_RATIO = 0.2;
+
+/**
+ * Mesmo em coleções pequenas, permite sempre remover até este número —
+ * sem isto, num álbum de 3 fotografias 20% arredondaria a zero e a
+ * sincronização nunca chegaria a fazer nada.
+ */
+const MIN_REMOVAL_ALLOWANCE = 5;
+
 export interface DriveSyncResult {
   connectionsChecked: number;
   connectionsFailed: number;
+  /**
+   * Ligações onde a sincronização foi recusada por precaução (ver
+   * `assessRemoval`) — não é uma falha, é o mecanismo de segurança a
+   * funcionar. Contado à parte de `connectionsFailed` para os dois
+   * casos não se confundirem nos logs.
+   */
+  connectionsSkipped: number;
   photosChecked: number;
   photosRemoved: number;
+}
+
+/**
+ * Decide se o resultado desta passagem é credível ao ponto de se agir
+ * sobre ele.
+ *
+ * Esta sincronização infere eliminações por AUSÊNCIA: tudo o que não
+ * aparecer na listagem do Drive é tratado como apagado. É uma inferência
+ * perigosa, porque uma listagem vazia ou truncada — sem lançar erro
+ * nenhum — é indistinguível de "o dono apagou tudo à mão". E a remoção
+ * destrói o preview e a miniatura na Storage, de forma irreversível.
+ *
+ * O caso realista que motiva isto: o âmbito `drive.file` só dá acesso
+ * aos ficheiros criados pela própria aplicação naquela conta. Se o
+ * administrador reconectar o Drive escolhendo por engano outra conta
+ * Google (cenário nada teórico — a ligação expira ao fim de 7 dias
+ * enquanto o consentimento OAuth estiver em "Testing", ADR 0031), a
+ * listagem passa a vir vazia e a passagem seguinte apagaria o álbum
+ * inteiro, sozinha, de madrugada.
+ *
+ * Na dúvida, não apagar: uma fotografia a mais na galeria é um
+ * incómodo, um álbum de casamento apagado não tem recuperação simples.
+ */
+function assessRemoval(
+  missingCount: number,
+  totalCount: number,
+): { safe: true } | { safe: false; reason: string } {
+  if (missingCount === 0) return { safe: true };
+
+  if (missingCount === totalCount) {
+    return {
+      safe: false,
+      reason: "drive_listing_empty",
+    };
+  }
+
+  const allowance = Math.max(
+    MIN_REMOVAL_ALLOWANCE,
+    Math.floor(totalCount * MAX_REMOVAL_RATIO),
+  );
+  if (missingCount > allowance) {
+    return { safe: false, reason: "removal_ratio_exceeded" };
+  }
+
+  return { safe: true };
 }
 
 /**
@@ -52,6 +117,7 @@ export async function syncDeletedDrivePhotos(
   const result: DriveSyncResult = {
     connectionsChecked: 0,
     connectionsFailed: 0,
+    connectionsSkipped: 0,
     photosChecked: 0,
     photosRemoved: 0,
   };
@@ -77,10 +143,38 @@ export async function syncDeletedDrivePhotos(
         albums.map((album) => album.id),
       );
 
-      for (const photo of photos) {
-        result.photosChecked += 1;
-        if (activePhotoIds.has(photo.id)) continue;
+      result.photosChecked += photos.length;
 
+      // Primeiro decidir, só depois apagar: a avaliação precisa do
+      // total em falta, que só se conhece depois de percorrer tudo.
+      const missing = photos.filter((photo) => !activePhotoIds.has(photo.id));
+      const assessment = assessRemoval(missing.length, photos.length);
+
+      if (!assessment.safe) {
+        result.connectionsSkipped += 1;
+        logger.error({
+          operation: "driveSync.abortedUnsafe",
+          connectionId: connection.id,
+          reason: assessment.reason,
+          missingCount: missing.length,
+          totalCount: photos.length,
+          message:
+            "Sincronização recusada por precaução: nenhuma fotografia foi removida.",
+        });
+        await deps.auditLog.record({
+          actor_user_id: null,
+          action: "drive_sync.aborted_unsafe",
+          metadata: {
+            connectionId: connection.id,
+            reason: assessment.reason,
+            missingCount: missing.length,
+            totalCount: photos.length,
+          },
+        });
+        continue;
+      }
+
+      for (const photo of missing) {
         const album = albumsById.get(photo.album_id);
         if (!album) continue;
 
