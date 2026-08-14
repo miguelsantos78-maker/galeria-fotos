@@ -113,7 +113,15 @@ export async function resolveAlbumSession(
     : link.permissions.filter((permission) => permission !== "upload");
 
   const isOwner = !ctx.isAnonymous && ctx.userId === album.owner_id;
-  const coverPhotoUrl = await resolveCoverPhotoUrl(album, deps);
+
+  // A fotografia de capa e a sessão em vigor não dependem uma da outra.
+  // Isto está no caminho crítico de abrir a galeria — é o primeiro
+  // pedido que o convidado faz, e nada aparece no ecrã antes de ele
+  // responder —, por isso os dois round trips valem a pena ser um só.
+  const [coverPhotoUrl, current] = await Promise.all([
+    resolveCoverPhotoUrl(album, deps),
+    deps.sessions.findValidForUser(album.id, ctx.userId),
+  ]);
 
   const sessionExpiresAt = new Date(
     Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000,
@@ -134,7 +142,6 @@ export async function resolveAlbumSession(
   // entretanto (upload desligado), ou um link diferente do que a
   // criou, casos em que a sessão antiga deixaria o convidado com mais
   // acesso do que o link atual concede.
-  const current = await deps.sessions.findValidForUser(album.id, ctx.userId);
   const isCurrentStillAccurate =
     current !== null &&
     current.share_link_id === link.id &&

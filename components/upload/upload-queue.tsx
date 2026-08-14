@@ -21,6 +21,14 @@ import {
 const MAX_FILE_BYTES = 4_000_000;
 const MAX_FILES = 50;
 const MAX_CONCURRENT_UPLOADS = 3;
+
+/**
+ * Quantas fotografias são preparadas ao mesmo tempo antes do envio.
+ * Dois, não todas: a otimização é trabalho de CPU/memória no
+ * telemóvel, e o objetivo é ter a primeira pronta depressa para o
+ * envio arrancar, não ter todas prontas ao mesmo tempo.
+ */
+const MAX_CONCURRENT_OPTIMIZATIONS = 2;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const TOO_LARGE_MESSAGE = "Ficheiro demasiado grande.";
 
@@ -216,6 +224,38 @@ export function UploadQueue({ albumId }: { albumId: string }) {
     [updateItem],
   );
 
+  /**
+   * Otimiza por ordem, poucas de cada vez, em vez de largar todas ao
+   * mesmo tempo.
+   *
+   * Antes, selecionar 30 fotografias começava 30 `createImageBitmap` +
+   * canvas em simultâneo: num telemóvel isso é uma tempestade de
+   * memória e CPU que trava a interface, e — pior para a sensação de
+   * lentidão — **nenhum envio pode começar enquanto a primeira não
+   * terminar**, porque todas competem pelo mesmo processador. Em série
+   * limitada, a primeira fica pronta quase de imediato e o envio
+   * arranca enquanto as restantes ainda estão a ser preparadas.
+   */
+  const optimizePending = useCallback(
+    async (pending: QueueItem[]) => {
+      let next = 0;
+      const worker = async () => {
+        for (;;) {
+          const item = pending[next++];
+          if (!item) return;
+          await optimizeItem(item);
+        }
+      };
+      await Promise.all(
+        Array.from(
+          { length: Math.min(MAX_CONCURRENT_OPTIMIZATIONS, pending.length) },
+          worker,
+        ),
+      );
+    },
+    [optimizeItem],
+  );
+
   function handleFilesSelected(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
     const files = Array.from(fileList);
@@ -267,9 +307,9 @@ export function UploadQueue({ albumId }: { albumId: string }) {
     });
 
     setItems((current) => [...current, ...newItems]);
-    for (const item of newItems) {
-      if (item.status === "optimizing") void optimizeItem(item);
-    }
+    void optimizePending(
+      newItems.filter((item) => item.status === "optimizing"),
+    );
   }
 
   function handleCancel(itemId: string) {

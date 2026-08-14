@@ -5,6 +5,7 @@ import { buildSecurityHeaders } from "@/lib/security/csp";
 
 const ADMIN_PREFIX = "/admin";
 const LOGIN_PATH = "/admin/login";
+const API_PREFIX = "/api/";
 
 function applyHeaders(response: NextResponse, headers: Record<string, string>) {
   for (const [name, value] of Object.entries(headers)) {
@@ -21,12 +22,28 @@ function applyHeaders(response: NextResponse, headers: Record<string, string>) {
  * autorização acontece sempre no servidor via requireAdmin()
  * (lib/auth/dal.ts), tal como recomendado pela documentação do Next.js
  * para Proxy/Middleware.
+ *
+ * PORQUE É QUE `/api` NÃO PASSA POR `getUser()`: essa chamada não lê um
+ * cookie, faz um pedido de rede ao servidor de autenticação do Supabase
+ * (`GET /auth/v1/user`) para validar o token — a cada pedido. As rotas
+ * de API já criam o seu próprio cliente (`createSupabaseServerClient`),
+ * que num Route Handler consegue escrever cookies e faz a sua própria
+ * autenticação; passar aqui primeiro duplicava esse round trip em todos
+ * os pedidos à API, sem acrescentar garantia nenhuma. Num envio de 50
+ * fotografias — duas chamadas à API por fotografia — eram 100 idas ao
+ * servidor de autenticação só para chegar ao mesmo resultado.
+ *
+ * Os cabeçalhos de segurança continuam a ser aplicados a tudo.
  */
 export async function updateSession(request: NextRequest) {
   const env = getPublicEnv();
   const { headers: securityHeaders } = buildSecurityHeaders(
     env.NEXT_PUBLIC_SUPABASE_URL,
   );
+
+  if (request.nextUrl.pathname.startsWith(API_PREFIX)) {
+    return applyHeaders(NextResponse.next({ request }), securityHeaders);
+  }
 
   let response = NextResponse.next({ request });
 

@@ -71,7 +71,17 @@ async function authorizeUpload(
   userId: string,
   deps: Pick<UploadsDeps, "albums" | "sessions">,
 ): Promise<{ album: AlbumRow }> {
-  const session = await deps.sessions.findValidForUser(albumId, userId);
+  // As duas consultas não dependem uma da outra, por isso vão juntas:
+  // em série somavam-se dois round trips à base de dados, e isto corre
+  // duas vezes por fotografia (ao iniciar e ao concluir o envio). A
+  // ordem das verificações abaixo mantém-se — primeiro a sessão, depois
+  // o álbum — para a mensagem de erro não mudar consoante o que
+  // respondeu mais depressa.
+  const [session, album] = await Promise.all([
+    deps.sessions.findValidForUser(albumId, userId),
+    deps.albums.findById(albumId),
+  ]);
+
   if (!session || !session.permissions.includes("upload")) {
     throw new AppError(
       "ALBUM_UPLOAD_FORBIDDEN",
@@ -80,7 +90,6 @@ async function authorizeUpload(
     );
   }
 
-  const album = await deps.albums.findById(albumId);
   if (!album || album.status !== "published") {
     throw new AppError(
       "ALBUM_UPLOAD_FORBIDDEN",
@@ -110,9 +119,17 @@ export async function initiateUpload(
   ctx: { albumId: string; userId: string },
   deps: Pick<UploadsDeps, "albums" | "sessions" | "uploadJobs" | "photos">,
 ): Promise<InitiateUploadResult> {
-  await authorizeUpload(ctx.albumId, ctx.userId, deps);
-
+  // A contagem do álbum não depende da autorização, por isso arranca
+  // ao mesmo tempo — é mais um round trip que estaria a somar-se em
+  // série, a cada fotografia. A autorização continua a ser a primeira
+  // a ser verificada: `Promise.all` rejeita com o erro do primeiro a
+  // falhar, e `authorizeUpload` está na primeira posição.
   const env = getServerEnv();
+  const [, photoCount] = await Promise.all([
+    authorizeUpload(ctx.albumId, ctx.userId, deps),
+    deps.photos.countForAlbumIds([ctx.albumId]),
+  ]);
+
   if (input.expectedSize > env.MAX_UPLOAD_BYTES) {
     throw new AppError(
       "UPLOAD_FILE_TOO_LARGE",
@@ -124,7 +141,6 @@ export async function initiateUpload(
   // Verificado aqui, no passo barato, e não em `completeUpload`: chumbar
   // depois de o ficheiro já ter atravessado a rede e ido para o Drive
   // seria gastar exatamente aquilo que este limite existe para poupar.
-  const photoCount = await deps.photos.countForAlbumIds([ctx.albumId]);
   if (photoCount >= env.MAX_PHOTOS_PER_ALBUM) {
     throw new AppError(
       "ALBUM_PHOTO_LIMIT_REACHED",
@@ -200,14 +216,26 @@ export async function completeUpload(
     );
   }
 
-  await deps.uploadJobs.update(job.id, {
-    status: "uploading",
-    received_size: params.fileBuffer.length,
-  });
-
   const mimeType = await detectImageMimeType(params.fileBuffer);
 
-  const connection = await deps.connections.findActiveByUser(album.owner_id);
+  // Estes três não dependem uns dos outros e são o grosso do tempo
+  // desta função: gerar as derivadas ronda os 700ms de CPU por
+  // fotografia, e em série ficavam à espera de dois round trips à base
+  // de dados que podiam ter acontecido entretanto. `processImage` já
+  // valida a imagem por si, por isso a marcação de "uploading" ir junta
+  // não antecipa nada que não fosse acontecer de qualquer forma.
+  const [connection, processed] = await Promise.all([
+    deps.connections.findActiveByUser(album.owner_id),
+    processImage(params.fileBuffer, {
+      previewMaxEdge: env.PREVIEW_MAX_EDGE,
+      thumbnailMaxEdge: env.THUMBNAIL_MAX_EDGE,
+    }),
+    deps.uploadJobs.update(job.id, {
+      status: "uploading",
+      received_size: params.fileBuffer.length,
+    }),
+  ]);
+
   if (!connection || !connection.root_folder_id) {
     await deps.uploadJobs.update(job.id, { status: "failed" });
     throw new AppError(
@@ -216,11 +244,6 @@ export async function completeUpload(
       503,
     );
   }
-
-  const processed = await processImage(params.fileBuffer, {
-    previewMaxEdge: env.PREVIEW_MAX_EDGE,
-    thumbnailMaxEdge: env.THUMBNAIL_MAX_EDGE,
-  });
 
   const duplicate = await deps.photos.findByAlbumAndSha256(
     ctx.albumId,
@@ -360,18 +383,22 @@ export async function completeUpload(
     throw error;
   }
 
-  await deps.uploadJobs.update(job.id, {
-    status: "completed",
-    received_size: params.fileBuffer.length,
-  });
-
-  await deps.auditLog.record({
-    actor_user_id: ctx.userId,
-    album_id: ctx.albumId,
-    photo_id: photo.id,
-    action: "photo.uploaded",
-    metadata: { originalFilename: params.declaredFilename, mimeType },
-  });
+  // Duas escritas independentes, ambas depois de a fotografia já
+  // existir: em série eram mais dois round trips a atrasar a resposta
+  // ao convidado, sem que nenhuma dependesse do resultado da outra.
+  await Promise.all([
+    deps.uploadJobs.update(job.id, {
+      status: "completed",
+      received_size: params.fileBuffer.length,
+    }),
+    deps.auditLog.record({
+      actor_user_id: ctx.userId,
+      album_id: ctx.albumId,
+      photo_id: photo.id,
+      action: "photo.uploaded",
+      metadata: { originalFilename: params.declaredFilename, mimeType },
+    }),
+  ]);
 
   return photo;
 }

@@ -223,4 +223,37 @@ describe("UploadQueue", () => {
     });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
+  it("prepara as fotografias grandes por ordem, não todas ao mesmo tempo", async () => {
+    // 5 ficheiros acima do limite de otimização (2MB). Antes, os 5
+    // arrancavam em simultâneo: num telemóvel isso trava a interface e
+    // atrasa o primeiro envio, porque todos disputam o mesmo CPU.
+    let concurrent = 0;
+    let peakConcurrent = 0;
+    const releases: Array<() => void> = [];
+
+    vi.stubGlobal("createImageBitmap", async () => {
+      concurrent += 1;
+      peakConcurrent = Math.max(peakConcurrent, concurrent);
+      await new Promise<void>((resolve) => releases.push(resolve));
+      concurrent -= 1;
+      return { width: 4000, height: 3000, close: () => {} };
+    });
+
+    renderUploadQueue();
+    const user = userEvent.setup();
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    const big = () =>
+      new File([new Uint8Array(2_500_000)], "grande.jpg", {
+        type: "image/jpeg",
+      });
+    await user.upload(input, [big(), big(), big(), big(), big()]);
+
+    await waitFor(() => expect(releases.length).toBeGreaterThan(0));
+    expect(peakConcurrent).toBeLessThanOrEqual(2);
+
+    for (const release of releases) release();
+  });
 });
