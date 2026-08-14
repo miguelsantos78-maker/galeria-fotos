@@ -234,6 +234,61 @@ test("não mostra nenhuma data quando o álbum não tem uma definida", async ({
   await expect(page.getByText(/de \d{4}$/)).toHaveCount(0);
 });
 
+test("a galeria abre com um pedido só, e as primeiras miniaturas não esperam", async ({
+  page,
+}) => {
+  await page.route("https://signed.example.com/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: Buffer.from(TINY_PNG_BASE64, "base64"),
+    });
+  });
+
+  const listingCalls: string[] = [];
+  await page.route("**/api/albums/*/photos*", async (route) => {
+    listingCalls.push(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: { photos: [], nextCursor: null, totalCount: 0 },
+        error: null,
+      }),
+    });
+  });
+
+  const photos = Array.from({ length: 12 }, (_, i) => photoRow(`p${i + 1}`));
+  await mockResolve(page, {
+    permissions: ["view"],
+    initialPhotos: { photos, nextCursor: null, totalCount: photos.length },
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/a/token-de-teste");
+
+  const tiles = page.locator('button:has(img[alt="Fotografia do álbum"])');
+  await expect(tiles).toHaveCount(12);
+  await expect(page.getByText("12 fotografias")).toBeVisible();
+
+  // As do primeiro ecrã não esperam pelo cálculo do layout; as de baixo
+  // continuam a esperar, senão competiam por largura de banda com elas.
+  await expect(tiles.nth(0).locator("img")).toHaveAttribute("loading", "eager");
+  await expect(tiles.nth(0).locator("img")).toHaveAttribute(
+    "fetchpriority",
+    "high",
+  );
+  await expect(tiles.nth(11).locator("img")).toHaveAttribute("loading", "lazy");
+
+  // A lightbox funciona com os dados que vieram da resolução.
+  await tiles.first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+
+  // O ponto central: abrir a galeria não faz um segundo pedido.
+  await page.waitForTimeout(500);
+  expect(listingCalls).toHaveLength(0);
+});
+
 test("virtualiza a grelha para álbuns com muitas fotografias, e continua a abrir o lightbox", async ({
   page,
 }) => {

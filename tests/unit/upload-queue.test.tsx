@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { UploadQueue } from "@/components/upload/upload-queue";
@@ -255,5 +255,51 @@ describe("UploadQueue", () => {
     expect(peakConcurrent).toBeLessThanOrEqual(2);
 
     for (const release of releases) release();
+  });
+
+  it("atualiza a galeria uma vez por rajada, não uma vez por fotografia", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    render(
+      <QueryClientProvider client={queryClient}>
+        <UploadQueue albumId="album-1" />
+      </QueryClientProvider>,
+    );
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    await user.upload(input, [
+      new File(["a"], "a.jpg", { type: "image/jpeg" }),
+      new File(["b"], "b.jpg", { type: "image/jpeg" }),
+      new File(["c"], "c.jpg", { type: "image/jpeg" }),
+    ]);
+
+    await waitFor(() => expect(FakeXHR.instances).toHaveLength(3));
+    for (const instance of FakeXHR.instances) {
+      instance.respond(200, { data: {}, error: null });
+    }
+
+    // Invalidar uma query paginada refaz TODAS as páginas em cache: uma
+    // invalidação por fotografia multiplicava-se pelo número de páginas
+    // que o convidado já tinha percorrido.
+    // Deixar as promessas do envio resolverem antes de mexer no
+    // relógio — senão o debounce ainda nem tinha sido agendado.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    const galleryInvalidations = invalidateSpy.mock.calls.filter(
+      ([arg]) =>
+        JSON.stringify((arg as { queryKey?: unknown })?.queryKey) ===
+        JSON.stringify(["albums", "album-1", "photos"]),
+    );
+    expect(galleryInvalidations).toHaveLength(1);
+    vi.useRealTimers();
   });
 });

@@ -29,6 +29,11 @@ const MAX_CONCURRENT_UPLOADS = 3;
  * envio arrancar, não ter todas prontas ao mesmo tempo.
  */
 const MAX_CONCURRENT_OPTIMIZATIONS = 2;
+
+/** Espera por uma pausa nos envios antes de atualizar a galeria — o
+ * mesmo raciocínio (e a mesma ordem de grandeza) do debounce em
+ * `lib/realtime/use-photos-realtime.ts`. */
+const GALLERY_REFRESH_DEBOUNCE_MS = 1000;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const TOO_LARGE_MESSAGE = "Ficheiro demasiado grande.";
 
@@ -138,6 +143,36 @@ export function UploadQueue({ albumId }: { albumId: string }) {
     );
   }, []);
 
+  /**
+   * Uma atualização da galeria por rajada de envios, não uma por
+   * fotografia.
+   *
+   * Invalidar uma query paginada refaz **todas** as páginas em cache
+   * (medido — ver docs/decisions/0038). Isto corria a cada fotografia
+   * concluída: quem tivesse percorrido a galeria antes de enviar 50
+   * fotografias provocava 50 invalidações × as páginas carregadas,
+   * sozinho, ao mesmo tempo que estava a enviar os ficheiros. Era o
+   * mesmo problema que o tempo real já tinha resolvido, num caminho
+   * que lhe escapava.
+   */
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const refreshGalleryDebounced = useCallback(() => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => {
+      queryClient.invalidateQueries({
+        queryKey: ["albums", albumId, "photos"],
+      });
+    }, GALLERY_REFRESH_DEBOUNCE_MS);
+  }, [albumId, queryClient]);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    };
+  }, []);
+
   const runUpload = useCallback(
     async (item: QueueItem) => {
       updateItem(item.id, { status: "uploading", progress: 0 });
@@ -164,9 +199,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
 
         xhrByItemId.current.delete(item.id);
         updateItem(item.id, { status: "done", progress: 100 });
-        queryClient.invalidateQueries({
-          queryKey: ["albums", albumId, "photos"],
-        });
+        refreshGalleryDebounced();
       } catch (error) {
         xhrByItemId.current.delete(item.id);
         if (error instanceof UploadCanceledError) {
