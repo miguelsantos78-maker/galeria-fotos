@@ -52,7 +52,7 @@ export function AlbumResolver({ token }: { token: string }) {
     );
   }
 
-  const { album, permissions, isOwner } = mutation.data;
+  const { album, permissions, isOwner, initialPhotos } = mutation.data;
   const canUpload = permissions.includes("upload");
 
   return (
@@ -74,6 +74,11 @@ export function AlbumResolver({ token }: { token: string }) {
             <img
               src={album.coverPhotoUrl}
               alt=""
+              // É a maior imagem do ecrã e a primeira que se vê: é ela
+              // que determina quando a página "parece" carregada, por
+              // isso vai à frente das miniaturas na fila do browser.
+              fetchPriority="high"
+              decoding="async"
               className="absolute inset-0 h-full w-full object-cover"
             />
             <div className="rounded-card border-border/40 bg-surface/60 absolute inset-x-3 bottom-3 border p-5 text-center shadow-lg backdrop-blur-md sm:inset-x-6 sm:bottom-6 sm:p-6">
@@ -134,6 +139,7 @@ export function AlbumResolver({ token }: { token: string }) {
           albumId={album.id}
           downloadEnabled={album.downloadEnabled}
           isOwner={isOwner}
+          initialPhotos={initialPhotos}
         />
       </div>
 

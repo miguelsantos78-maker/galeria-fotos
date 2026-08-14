@@ -129,7 +129,14 @@ export function VirtualizedPhotoGrid({
             }}
           >
             {row.map((photo) => (
-              <PhotoTile key={photo.id} photo={photo} onOpen={onOpen} />
+              <PhotoTile
+                key={photo.id}
+                photo={photo}
+                onOpen={onOpen}
+                // Só a primeira linha: nas restantes, o virtualizador já
+                // só monta o que está perto de ser visto.
+                priority={virtualRow.index === 0}
+              />
             ))}
           </div>
         );

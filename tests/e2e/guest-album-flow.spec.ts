@@ -12,6 +12,21 @@ import AxeBuilder from "@axe-core/playwright";
  * fases anteriores.
  */
 
+function photoRow(id: string, isMine = false) {
+  return {
+    id,
+    width: 800,
+    height: 600,
+    blurhash: null,
+    status: "ready",
+    isFeatured: false,
+    uploadedAt: new Date().toISOString(),
+    previewUrl: `https://signed.example.com/${id}.png`,
+    thumbnailUrl: `https://signed.example.com/${id}-thumb.png`,
+    isMine,
+  };
+}
+
 const RESOLVED_ALBUM = {
   album: {
     id: "11111111-1111-1111-1111-111111111111",
@@ -26,6 +41,13 @@ const RESOLVED_ALBUM = {
   },
   permissions: ["view", "upload"],
   isOwner: false,
+  // A primeira página vem já na resolução do link (ADR 0041) — os
+  // testes que precisam de fotografias substituem isto via `overrides`.
+  initialPhotos: {
+    photos: [] as ReturnType<typeof photoRow>[],
+    nextCursor: null as number | null,
+    totalCount: 0,
+  },
 };
 
 async function mockResolve(
@@ -59,21 +81,6 @@ async function mockEmptyPhotos(page: import("@playwright/test").Page) {
 
 const TINY_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
-
-function photoRow(id: string, isMine = false) {
-  return {
-    id,
-    width: 800,
-    height: 600,
-    blurhash: null,
-    status: "ready",
-    isFeatured: false,
-    uploadedAt: new Date().toISOString(),
-    previewUrl: `https://signed.example.com/${id}.png`,
-    thumbnailUrl: `https://signed.example.com/${id}-thumb.png`,
-    isMine,
-  };
-}
 
 test("um convidado abre um link válido e vê o álbum", async ({ page }) => {
   await mockResolve(page);
@@ -238,22 +245,16 @@ test("virtualiza a grelha para álbuns com muitas fotografias, e continua a abri
       body: Buffer.from(TINY_PNG_BASE64, "base64"),
     });
   });
-  await mockResolve(page, { permissions: ["view"] });
-  await page.route("**/api/albums/*/photos*", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        data: {
-          photos: Array.from({ length: PHOTO_COUNT }, (_, i) =>
-            photoRow(`p${i + 1}`),
-          ),
-          nextCursor: null,
-          totalCount: PHOTO_COUNT,
-        },
-        error: null,
-      }),
-    });
+  const allPhotos = Array.from({ length: PHOTO_COUNT }, (_, i) =>
+    photoRow(`p${i + 1}`),
+  );
+  await mockResolve(page, {
+    permissions: ["view"],
+    initialPhotos: {
+      photos: allPhotos,
+      nextCursor: null,
+      totalCount: PHOTO_COUNT,
+    },
   });
 
   await page.setViewportSize({ width: 390, height: 800 });
@@ -302,16 +303,23 @@ test("mostra o contador e filtra pelas fotografias do próprio convidado", async
       body: Buffer.from(TINY_PNG_BASE64, "base64"),
     });
   });
-  await mockResolve(page, { permissions: ["view"] });
+  const allPhotos = [photoRow("p1", true), photoRow("p2"), photoRow("p3")];
+  // A vista por omissão vem já na resolução; o endpoint de listagem só
+  // é chamado quando o filtro muda.
+  await mockResolve(page, {
+    permissions: ["view"],
+    initialPhotos: {
+      photos: allPhotos,
+      nextCursor: null,
+      totalCount: allPhotos.length,
+    },
+  });
 
   // O servidor é que filtra (?mine=true) — o mock responde em
   // conformidade, como o endpoint real faria.
   await page.route("**/api/albums/*/photos*", async (route) => {
     const onlyMine = new URL(route.request().url()).searchParams.get("mine");
-    const photos =
-      onlyMine === "true"
-        ? [photoRow("p1", true)]
-        : [photoRow("p1", true), photoRow("p2"), photoRow("p3")];
+    const photos = onlyMine === "true" ? [photoRow("p1", true)] : allPhotos;
     await route.fulfill({
       status: 200,
       contentType: "application/json",

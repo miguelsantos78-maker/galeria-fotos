@@ -22,6 +22,12 @@ import { BackToTop } from "./back-to-top";
  * abaixo, a grelha simples já é suficiente e mais fácil de percorrer. */
 const VIRTUALIZE_THRESHOLD = 60;
 
+/** Quantas miniaturas carregam sem esperar pelo `lazy`. Cobre com folga
+ * o primeiro ecrã num telemóvel (3 colunas), que é o que decide a
+ * sensação de rapidez; passar muito disto só faria as primeiras
+ * competirem por largura de banda com o que ainda nem está à vista. */
+const EAGER_TILE_COUNT = 9;
+
 /** "Já montou no cliente?" — o padrão recomendado pelo próprio React
  * para isto (em vez de `useState` + `useEffect`, que dispara uma
  * segunda renderização evitável): `getServerSnapshot` devolve sempre
@@ -61,10 +67,14 @@ export function PhotoGrid({
   albumId,
   downloadEnabled,
   isOwner,
+  initialPhotos,
 }: {
   albumId: string;
   downloadEnabled: boolean;
   isOwner: boolean;
+  /** Primeira página já vinda com a resolução do link — ver
+   * `ResolveAlbumResult.initialPhotos`. */
+  initialPhotos: ListPhotosResult;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -86,6 +96,14 @@ export function PhotoGrid({
     },
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    // Semeada com o que já veio na resolução do link, para a galeria
+    // aparecer sem um segundo pedido. Só na vista por omissão: com o
+    // filtro "as minhas fotos" ligado, a lista é outra e tem mesmo de
+    // ser pedida. `staleTime` (app/providers.tsx) evita que isto seja
+    // refeito de imediato só por ter sido semeado.
+    initialData: onlyMine
+      ? undefined
+      : { pages: [initialPhotos], pageParams: [undefined] },
     // Deliberadamente NÃO desligado: os URLs das miniaturas são
     // assinados e expiram (ver lib/media/preview-url.ts), por isso
     // voltar ao separador ao fim de muito tempo tem de os poder
@@ -264,11 +282,12 @@ export function PhotoGrid({
             <VirtualizedPhotoGrid photos={photos} onOpen={updatePhotoParam} />
           ) : (
             <div className="grid grid-cols-3 gap-0.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-              {photos.map((photo) => (
+              {photos.map((photo, index) => (
                 <PhotoTile
                   key={photo.id}
                   photo={photo}
                   onOpen={updatePhotoParam}
+                  priority={index < EAGER_TILE_COUNT}
                 />
               ))}
             </div>

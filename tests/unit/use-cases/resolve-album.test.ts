@@ -353,6 +353,41 @@ describe("resolveAlbumSession", () => {
     expect(result.album.coverPhotoUrl).toBeNull();
   });
 
+  it("devolve já a primeira página de fotografias, sem um segundo pedido", async () => {
+    const photoRows = [
+      makePhotoRow({ album_id: "album-1", status: "ready" }),
+      makePhotoRow({ album_id: "album-1", status: "ready" }),
+    ];
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup({ album: { id: "album-1" }, photos: photoRows });
+
+    const result = await resolveAlbumSession(
+      { token },
+      { userId: "guest-1", isAnonymous: true },
+      { albums, shareLinks, sessions, photos, createSignedUrls },
+    );
+
+    // Sem isto, abrir a galeria eram dois pedidos em série: o segundo
+    // só podia começar depois de este responder com o `albumId`.
+    expect(result.initialPhotos.photos).toHaveLength(2);
+    expect(result.initialPhotos.totalCount).toBe(2);
+    expect(result.initialPhotos.photos[0].thumbnailUrl).toContain("https://");
+  });
+
+  it("a primeira página vem vazia num álbum sem fotografias", async () => {
+    const { token, albums, shareLinks, sessions, photos, createSignedUrls } =
+      setup();
+
+    const result = await resolveAlbumSession(
+      { token },
+      { userId: "guest-1", isAnonymous: true },
+      { albums, shareLinks, sessions, photos, createSignedUrls },
+    );
+
+    expect(result.initialPhotos.photos).toEqual([]);
+    expect(result.initialPhotos.nextCursor).toBeNull();
+  });
+
   describe("reaproveitamento da sessão em vigor", () => {
     it("não cria uma linha nova quando já existe uma sessão válida e igual", async () => {
       const deps = setup();

@@ -42,7 +42,13 @@ export interface ListPhotosResult {
 
 interface ListPhotosDeps {
   sessions: AlbumSessionsRepository;
-  photos: PhotosRepository;
+  // Só o que a listagem usa, e não o repositório inteiro: assim
+  // `resolveAlbumSession` pode reutilizar isto sem ter de declarar uma
+  // dependência de escrita em `photos` que nunca exerce.
+  photos: Pick<
+    PhotosRepository,
+    "listVisibleForAlbum" | "countVisibleForAlbum"
+  >;
   createSignedUrls: (paths: string[]) => Promise<Map<string, string>>;
 }
 
@@ -68,7 +74,30 @@ export async function listPhotosForViewer(
     );
   }
 
-  const canModerate = session.permissions.includes("moderate");
+  return listPhotosForPermissions(
+    albumId,
+    userId,
+    session.permissions,
+    options,
+    deps,
+  );
+}
+
+/**
+ * O mesmo, para quem já sabe as permissões e não precisa de as ir
+ * buscar outra vez — o caso de `resolveAlbumSession`, que acabou de
+ * criar (ou reaproveitar) a sessão e já as tem em mão. Sem isto,
+ * incluir a primeira página na resposta da resolução custava uma
+ * consulta redundante à `album_sessions`.
+ */
+export async function listPhotosForPermissions(
+  albumId: string,
+  userId: string,
+  permissions: string[],
+  options: { cursor?: number; limit?: number; onlyMine?: boolean },
+  deps: Omit<ListPhotosDeps, "sessions">,
+): Promise<ListPhotosResult> {
+  const canModerate = permissions.includes("moderate");
   const limit = Math.min(options.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
   const uploadedBy = options.onlyMine ? userId : undefined;
 

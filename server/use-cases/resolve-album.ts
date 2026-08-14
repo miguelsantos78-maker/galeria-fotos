@@ -7,6 +7,7 @@ import type { ResolveAlbumInput } from "@/lib/validation/share-link";
 import { hashShareToken } from "@/lib/security/tokens";
 import { verifyPin } from "@/lib/security/pin";
 import { AppError } from "@/lib/api/response";
+import { listPhotosForPermissions, type ListPhotosResult } from "./photos";
 import { getServerEnv } from "@/lib/env";
 import type {
   AlbumSessionPermission,
@@ -50,13 +51,26 @@ export interface ResolveAlbumResult {
    * + verificação de `owner_id` em `deletePhoto`).
    */
   isOwner: boolean;
+  /**
+   * A primeira página da galeria, já incluída aqui.
+   *
+   * Abrir um álbum eram dois pedidos em série — resolver o link e só
+   * depois listar as fotografias, porque o `albumId` só se conhece
+   * quando o primeiro responde. Nada aparecia no ecrã antes de ambos
+   * terminarem. Como esta função já tem tudo o que a listagem precisa
+   * (álbum, permissões, assinatura de URLs), devolvê-la aqui poupa uma
+   * ida completa à rede — autenticação incluída — no caminho mais
+   * sensível de todos: o primeiro ecrã que o convidado vê.
+   */
+  initialPhotos: ListPhotosResult;
 }
 
 interface ResolveDeps {
   albums: AlbumsRepository;
   shareLinks: ShareLinksRepository;
   sessions: AlbumSessionsRepository;
-  photos: Pick<PhotosRepository, "findById">;
+  photos: Pick<PhotosRepository, "findById"> &
+    Pick<PhotosRepository, "listVisibleForAlbum" | "countVisibleForAlbum">;
   createSignedUrls: (paths: string[]) => Promise<Map<string, string>>;
 }
 
@@ -157,10 +171,19 @@ export async function resolveAlbumSession(
     });
   }
 
+  const initialPhotos = await listPhotosForPermissions(
+    album.id,
+    ctx.userId,
+    permissions,
+    {},
+    { photos: deps.photos, createSignedUrls: deps.createSignedUrls },
+  );
+
   return {
     album: toPublicAlbumView(album, coverPhotoUrl),
     permissions,
     isOwner,
+    initialPhotos,
   };
 }
 
