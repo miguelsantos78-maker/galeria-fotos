@@ -117,12 +117,30 @@ export function createPhotosRepository(
     },
 
     async findByAlbumAndSha256(albumId, sha256) {
+      // `(album_id, sha256)` tem índice mas **não** é único (migração
+      // 0001), e a deteção de duplicados é um verifica-depois-insere:
+      // dois convidados a enviar a mesma fotografia ao mesmo tempo —
+      // a mesma imagem reencaminhada por WhatsApp, num casamento —
+      // passam ambos pela verificação e ambos inserem.
+      //
+      // Sem `limit(1)`, `maybeSingle()` rebenta com PGRST116 assim que
+      // existirem duas linhas (a cardinalidade é validada do lado do
+      // cliente, em PostgrestBuilder). E rebentava para sempre: a
+      // partir daí, qualquer envio dessa fotografia falhava com um erro
+      // não mapeado, em vez do "já foi enviada" que é a resposta certa.
+      // Um duplicado é um incómodo; transformá-lo numa falha permanente
+      // é que não. Ver docs/decisions/0044.
+      //
+      // A ordenação escolhe a primeira que entrou — a original — e não
+      // uma qualquer, para a mensagem ser estável entre tentativas.
       const { data, error } = await db
         .from("photos")
         .select("*")
         .eq("album_id", albumId)
         .eq("sha256", sha256)
         .is("deleted_at", null)
+        .order("uploaded_at", { ascending: true })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw toPostgrestError(error);
@@ -231,6 +249,14 @@ export function createPhotosRepository(
         .is("deleted_at", null)
         .order(sortBy, { ascending: false, nullsFirst: false })
         .order("sort_order", { ascending: false })
+        // Desempate final pelo `id`. Sem ele a ordem entre linhas
+        // empatadas nas duas primeiras colunas não é garantida pelo
+        // Postgres entre execuções — e `sort_order` empata mesmo (é o
+        // relógio em milissegundos). Com paginação por deslocamento,
+        // uma ordem instável faz a página 2 repetir ou saltar
+        // fotografias, num ecrã onde o administrador **elimina**
+        // fotografias: ver a errada é pior do que vê-la fora de ordem.
+        .order("id", { ascending: false })
         .range(offset, offset + pageSize - 1);
 
       if (error) throw toPostgrestError(error);
