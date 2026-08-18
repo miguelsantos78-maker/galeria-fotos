@@ -3,16 +3,19 @@ import { resetEnvCacheForTests } from "@/lib/env";
 import { encryptSecret } from "@/lib/security/encryption";
 import {
   batchModeratePhotos,
+  deleteOwnPhoto,
   deletePhoto,
   listPhotosForOwner,
   updatePhotoModeration,
 } from "@/server/use-cases/moderation";
 import {
+  createFakeAlbumSessionsRepository,
   createFakeAlbumsRepository,
   createFakeAuditLogRepository,
   createFakeGoogleConnectionsRepository,
   createFakePhotosRepository,
   makeAlbumRow,
+  makeAlbumSessionRow,
   makeGoogleConnectionRow,
   makePhotoRow,
 } from "../fakes/repositories";
@@ -416,6 +419,168 @@ describe("moderation use-cases", () => {
       await expect(
         deletePhoto(photo.id, "owner-2", deps),
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
+  });
+
+  describe("deleteOwnPhoto", () => {
+    function makeGuestDeps(
+      sessions = createFakeAlbumSessionsRepository([
+        makeAlbumSessionRow({ album_id: "album-1", user_id: "convidado-1" }),
+      ]),
+    ) {
+      const base = makeDeps();
+      return { ...base, sessions, deps: { ...base.deps, sessions } };
+    }
+
+    it("um convidado elimina a fotografia que enviou", async () => {
+      const { deps, photos, auditLog, driveProvider } = makeGuestDeps();
+      const photo = await photos.insert(
+        makePhotoRow({
+          album_id: "album-1",
+          status: "ready",
+          uploaded_by: "convidado-1",
+          drive_file_id: "drive-file-1",
+        }),
+      );
+
+      await deleteOwnPhoto(photo.id, "convidado-1", deps);
+
+      const updated = await photos.findById(photo.id);
+      expect(updated?.status).toBe("deleted");
+      expect(driveProvider.state.deletedFileIds).toContain("drive-file-1");
+      // Registado como ação do autor, não como moderação — a auditoria
+      // tem de distinguir quem apagou o quê (secção 15).
+      expect(auditLog.entries[0].action).toBe("photo.deleted_by_uploader");
+      expect(auditLog.entries[0].actor_user_id).toBe("convidado-1");
+    });
+
+    it("não deixa um convidado eliminar a fotografia de outro", async () => {
+      const { deps, photos, driveProvider } = makeGuestDeps();
+      const photo = await photos.insert(
+        makePhotoRow({
+          album_id: "album-1",
+          status: "ready",
+          uploaded_by: "outro-convidado",
+        }),
+      );
+
+      await expect(
+        deleteOwnPhoto(photo.id, "convidado-1", deps),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(driveProvider.state.deletedFileIds).toHaveLength(0);
+    });
+
+    it("não deixa eliminar sem sessão de álbum válida", async () => {
+      // Ter enviado a fotografia não chega: o `auth.uid()` anónimo
+      // sobrevive à revogação do link, por isso quem já não tem acesso
+      // ao álbum também não apaga lá dentro.
+      const { deps, photos, driveProvider } = makeGuestDeps(
+        createFakeAlbumSessionsRepository([]),
+      );
+      const photo = await photos.insert(
+        makePhotoRow({
+          album_id: "album-1",
+          status: "ready",
+          uploaded_by: "convidado-1",
+        }),
+      );
+
+      await expect(
+        deleteOwnPhoto(photo.id, "convidado-1", deps),
+      ).rejects.toMatchObject({ code: "ALBUM_SESSION_INVALID" });
+      expect(driveProvider.state.deletedFileIds).toHaveLength(0);
+    });
+
+    it("não deixa eliminar com uma sessão expirada", async () => {
+      const { deps, photos } = makeGuestDeps(
+        createFakeAlbumSessionsRepository([
+          makeAlbumSessionRow({
+            album_id: "album-1",
+            user_id: "convidado-1",
+            expires_at: new Date(Date.now() - 1000).toISOString(),
+          }),
+        ]),
+      );
+      const photo = await photos.insert(
+        makePhotoRow({
+          album_id: "album-1",
+          status: "ready",
+          uploaded_by: "convidado-1",
+        }),
+      );
+
+      await expect(
+        deleteOwnPhoto(photo.id, "convidado-1", deps),
+      ).rejects.toMatchObject({ code: "ALBUM_SESSION_INVALID" });
+    });
+
+    it("não deixa eliminar com uma sessão válida noutro álbum", async () => {
+      const { deps, photos } = makeGuestDeps(
+        createFakeAlbumSessionsRepository([
+          makeAlbumSessionRow({ album_id: "album-9", user_id: "convidado-1" }),
+        ]),
+      );
+      const photo = await photos.insert(
+        makePhotoRow({
+          album_id: "album-1",
+          status: "ready",
+          uploaded_by: "convidado-1",
+        }),
+      );
+
+      await expect(
+        deleteOwnPhoto(photo.id, "convidado-1", deps),
+      ).rejects.toMatchObject({ code: "ALBUM_SESSION_INVALID" });
+    });
+
+    it("elimina também uma fotografia ainda por aprovar", async () => {
+      const { deps, photos } = makeGuestDeps();
+      const photo = await photos.insert(
+        makePhotoRow({
+          album_id: "album-1",
+          status: "pending_review",
+          uploaded_by: "convidado-1",
+        }),
+      );
+
+      await deleteOwnPhoto(photo.id, "convidado-1", deps);
+
+      expect((await photos.findById(photo.id))?.status).toBe("deleted");
+    });
+
+    it("é idempotente e silencioso para uma fotografia já eliminada", async () => {
+      const { deps, photos } = makeGuestDeps();
+      const photo = await photos.insert(
+        makePhotoRow({
+          album_id: "album-1",
+          status: "ready",
+          uploaded_by: "convidado-1",
+        }),
+      );
+
+      await deleteOwnPhoto(photo.id, "convidado-1", deps);
+      await expect(
+        deleteOwnPhoto(photo.id, "convidado-1", deps),
+      ).resolves.toBeUndefined();
+      await expect(
+        deleteOwnPhoto("nao-existe", "convidado-1", deps),
+      ).resolves.toBeUndefined();
+    });
+
+    it("limpa a capa do álbum se a fotografia eliminada era a capa", async () => {
+      const { deps, photos, albums } = makeGuestDeps();
+      const photo = await photos.insert(
+        makePhotoRow({
+          album_id: "album-1",
+          status: "ready",
+          uploaded_by: "convidado-1",
+        }),
+      );
+      await albums.update("album-1", { cover_photo_id: photo.id });
+
+      await deleteOwnPhoto(photo.id, "convidado-1", deps);
+
+      expect((await albums.findById("album-1"))?.cover_photo_id).toBeNull();
     });
   });
 

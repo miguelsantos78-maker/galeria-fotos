@@ -1,6 +1,7 @@
 import "server-only";
 import type { Auth } from "googleapis";
 import type { AlbumsRepository } from "@/server/repositories/albums-repository";
+import type { AlbumSessionsRepository } from "@/server/repositories/album-sessions-repository";
 import type { PhotosRepository } from "@/server/repositories/photos-repository";
 import type { GoogleConnectionsRepository } from "@/server/repositories/google-connections-repository";
 import type { AuditLogRepository } from "@/server/repositories/audit-log-repository";
@@ -224,6 +225,23 @@ export async function deletePhoto(
     throw new AppError("FORBIDDEN", "Não tem acesso a esta fotografia.", 403);
   }
 
+  await removeFromDriveAndCatalog(photo, album, "photo.deleted", ownerId, deps);
+}
+
+/**
+ * A eliminação em si, depois de a autorização já estar decidida: apagar
+ * o original no Drive e só então o catálogo, a Storage e a capa.
+ * Partilhada pela eliminação do administrador e pela do próprio autor,
+ * para as duas não poderem divergir — se uma limpasse menos do que a
+ * outra, ficariam ficheiros por apagar consoante quem carregou no botão.
+ */
+async function removeFromDriveAndCatalog(
+  photo: PhotoRow,
+  album: AlbumRow,
+  action: string,
+  actorUserId: string,
+  deps: ModerationDeps,
+): Promise<void> {
   const connection = await deps.connections.findActiveByUser(album.owner_id);
   if (!connection) {
     throw new AppError(
@@ -244,7 +262,63 @@ export async function deletePhoto(
   // Idempotente do lado do adaptador: um 404 do Drive é tratado como sucesso.
   await provider.deleteFile({ fileId: photo.drive_file_id });
 
-  await finalizePhotoRemoval(photo, album, "photo.deleted", ownerId, deps);
+  await finalizePhotoRemoval(photo, album, action, actorUserId, deps);
+}
+
+/**
+ * Eliminação pelo próprio autor: qualquer pessoa pode apagar as
+ * fotografias que enviou, sem precisar de ser administrador (secção 15,
+ * privacidade: "disponibilizar eliminação completa de fotografia").
+ *
+ * As duas condições são verificadas aqui, no servidor, e não têm nada a
+ * ver com o `isMine` que a galeria mostra — esse é só a marca visual:
+ *
+ * 1. a fotografia foi mesmo enviada por quem está a pedir
+ *    (`uploaded_by`, que nunca sai para o cliente);
+ * 2. quem pede tem uma sessão de álbum **válida** para o álbum dela.
+ *
+ * A segunda existe porque a primeira não chega: o `auth.uid()` anónimo
+ * sobrevive à revogação do link e à expiração da sessão, e sem esta
+ * verificação alguém expulso do álbum continuaria a poder apagar lá
+ * dentro. Não basta ter sido autor; é preciso continuar a ter acesso.
+ */
+export async function deleteOwnPhoto(
+  photoId: string,
+  userId: string,
+  deps: ModerationDeps & { sessions: AlbumSessionsRepository },
+): Promise<void> {
+  const photo = await deps.photos.findById(photoId);
+  // Já apagada (ou nunca existiu): nada a fazer. Idempotente, para um
+  // segundo toque no botão não dar erro (secção 24, regra 12).
+  if (!photo || photo.deleted_at) return;
+
+  if (photo.uploaded_by !== userId) {
+    throw new AppError("FORBIDDEN", "Não tem acesso a esta fotografia.", 403);
+  }
+
+  const [session, album] = await Promise.all([
+    deps.sessions.findValidForUser(photo.album_id, userId),
+    deps.albums.findById(photo.album_id),
+  ]);
+
+  if (!session) {
+    throw new AppError(
+      "ALBUM_SESSION_INVALID",
+      "Sessão de álbum inválida ou expirada.",
+      401,
+    );
+  }
+  if (!album) {
+    throw new AppError("PHOTO_NOT_FOUND", "Fotografia não encontrada.", 404);
+  }
+
+  await removeFromDriveAndCatalog(
+    photo,
+    album,
+    "photo.deleted_by_uploader",
+    userId,
+    deps,
+  );
 }
 
 export interface BatchModerationResult {

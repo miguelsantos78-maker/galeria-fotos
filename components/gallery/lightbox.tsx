@@ -43,11 +43,12 @@ const VISIBLE_OFFSETS = [-1, 0, 1] as const;
 const MAX_PHOTOS_FOR_DOTS = 12;
 
 /**
- * Lightbox de ecrã inteiro (secção 10.2). "Eliminar" só aparece para o
- * dono do álbum (`isOwner`, resolvido no servidor em
- * `resolveAlbumSession` — nunca confiado apenas no cliente: o endpoint
- * `DELETE /api/photos/[photoId]` volta a validar a sessão de
- * administrador e a posse do álbum).
+ * Lightbox de ecrã inteiro (secção 10.2). "Eliminar" aparece para o
+ * dono do álbum (`isOwner`) e para quem enviou aquela fotografia
+ * (`photo.isMine`) — os dois resolvidos no servidor, nunca confiados
+ * apenas ao cliente: `DELETE /api/photos/[photoId]` volta a validar
+ * quem pede, comparando `uploaded_by` e exigindo uma sessão de álbum
+ * válida (ver `deleteOwnPhoto`).
  *
  * Em vez de um fundo preto sólido a cobrir a página, o diálogo abre
  * sobre a própria galeria com um véu semitransparente desfocado
@@ -269,13 +270,15 @@ export function Lightbox({
             </a>
           )}
 
-          {isOwner && (
+          {(isOwner || photo.isMine) && (
             <button
               type="button"
               onClick={() => {
                 if (
                   window.confirm(
-                    "Eliminar esta fotografia? Esta ação não pode ser desfeita.",
+                    isOwner
+                      ? "Eliminar esta fotografia? Esta ação não pode ser desfeita."
+                      : "Eliminar a sua fotografia? Ela desaparece da galeria para toda a gente e esta ação não pode ser desfeita.",
                   )
                 ) {
                   deleteMutation.mutate(photo.id);

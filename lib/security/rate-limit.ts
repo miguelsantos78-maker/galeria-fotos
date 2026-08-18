@@ -13,7 +13,7 @@ import { logger } from "@/lib/observability/logger";
  */
 
 export type RateLimitBucket =
-  "album-resolve" | "upload-initiate" | "upload-complete";
+  "album-resolve" | "upload-initiate" | "upload-complete" | "photo-delete";
 
 const BUCKET_CONFIG: Record<
   RateLimitBucket,
@@ -24,6 +24,10 @@ const BUCKET_CONFIG: Record<
   "album-resolve": { limit: 20, window: "1 m" },
   "upload-initiate": { limit: 60, window: "1 m" },
   "upload-complete": { limit: 30, window: "1 m" },
+  // Por utilizador. Folgado para quem está a limpar as suas
+  // fotografias uma a uma, apertado para um ciclo automático — cada
+  // eliminação custa uma chamada à API do Drive.
+  "photo-delete": { limit: 40, window: "1 m" },
 };
 
 let redisClient: Redis | null | undefined;
