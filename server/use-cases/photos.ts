@@ -1,6 +1,9 @@
 import "server-only";
 import type { AlbumSessionsRepository } from "@/server/repositories/album-sessions-repository";
-import type { PhotosRepository } from "@/server/repositories/photos-repository";
+import type {
+  PhotoCursor,
+  PhotosRepository,
+} from "@/server/repositories/photos-repository";
 import { buildThumbnailPath } from "@/lib/media/storage-paths";
 import { AppError } from "@/lib/api/response";
 import type { Database, PhotoStatus } from "@/lib/db/database.types";
@@ -31,7 +34,13 @@ export interface PublicPhoto {
 
 export interface ListPhotosResult {
   photos: PublicPhoto[];
-  nextCursor: number | null;
+  /**
+   * Opaco para o cliente: transporta a posição exata onde esta página
+   * terminou (`sort_order` + `id`), não só o `sort_order`. Ver
+   * `PhotoCursor` — com fotografias enviadas no mesmo milissegundo, um
+   * cursor só de `sort_order` fazia desaparecer as empatadas.
+   */
+  nextCursor: string | null;
   /**
    * Total de fotografias visíveis no álbum (com o mesmo filtro aplicado).
    * Só vem preenchido na primeira página — nas seguintes é `null`, para
@@ -62,7 +71,7 @@ interface ListPhotosDeps {
 export async function listPhotosForViewer(
   albumId: string,
   userId: string,
-  options: { cursor?: number; limit?: number; onlyMine?: boolean },
+  options: { cursor?: string; limit?: number; onlyMine?: boolean },
   deps: ListPhotosDeps,
 ): Promise<ListPhotosResult> {
   const session = await deps.sessions.findValidForUser(albumId, userId);
@@ -94,7 +103,7 @@ export async function listPhotosForPermissions(
   albumId: string,
   userId: string,
   permissions: string[],
-  options: { cursor?: number; limit?: number; onlyMine?: boolean },
+  options: { cursor?: string; limit?: number; onlyMine?: boolean },
   deps: Omit<ListPhotosDeps, "sessions">,
 ): Promise<ListPhotosResult> {
   const canModerate = permissions.includes("moderate");
@@ -105,7 +114,7 @@ export async function listPhotosForPermissions(
     albumId,
     canModerate,
     limit: limit + 1,
-    beforeSortOrder: options.cursor,
+    before: decodeCursor(options.cursor),
     uploadedBy,
   });
 
@@ -131,9 +140,50 @@ export async function listPhotosForPermissions(
   const photos = pageRows.map((row) =>
     toPublicPhoto(row, albumId, signedUrls, userId),
   );
-  const nextCursor = hasMore ? pageRows[pageRows.length - 1].sort_order : null;
+  const last = pageRows[pageRows.length - 1];
+  const nextCursor =
+    hasMore && last
+      ? encodeCursor({ sortOrder: last.sort_order, id: last.id })
+      : null;
 
   return { photos, nextCursor, totalCount };
+}
+
+/**
+ * O cursor é opaco para o cliente, mas chega do cliente — por isso é
+ * validado como qualquer outra entrada (secção 3: validar em todas as
+ * fronteiras). Um cursor mal formado é tratado como "sem cursor",
+ * devolvendo a primeira página, em vez de rebentar: o pior que
+ * acontece é o convidado voltar ao início da galeria.
+ *
+ * O `id` acaba interpolado no filtro `or(...)` do PostgREST, cuja
+ * sintaxe usa vírgulas, parênteses e pontos — por isso só passa se for
+ * composto exclusivamente por letras, dígitos e hífens. Isso fecha a
+ * porta a injetar sintaxe no filtro, que é o que aqui interessa
+ * garantir. Deliberadamente mais largo do que "tem de ser um UUID": a
+ * coluna é `uuid`, e é o Postgres que rejeita um id que o não seja —
+ * esta validação não precisa de duplicar essa garantia, só de não
+ * deixar passar caracteres que mudem o significado da consulta.
+ */
+const SAFE_ID_PATTERN = /^[A-Za-z0-9-]+$/;
+
+function encodeCursor(cursor: PhotoCursor): string {
+  return `${cursor.sortOrder}_${cursor.id}`;
+}
+
+function decodeCursor(raw: string | undefined): PhotoCursor | undefined {
+  if (!raw) return undefined;
+
+  const separator = raw.indexOf("_");
+  if (separator === -1) return undefined;
+
+  const sortOrder = Number(raw.slice(0, separator));
+  const id = raw.slice(separator + 1);
+  if (!Number.isSafeInteger(sortOrder) || !SAFE_ID_PATTERN.test(id)) {
+    return undefined;
+  }
+
+  return { sortOrder, id };
 }
 
 function toPublicPhoto(

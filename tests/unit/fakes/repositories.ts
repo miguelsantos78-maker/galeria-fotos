@@ -317,24 +317,38 @@ export function createFakePhotosRepository(
       albumId,
       canModerate,
       limit,
-      beforeSortOrder,
+      before,
       uploadedBy,
     }: ListVisiblePhotosInput) {
       const visibleStatuses = canModerate
         ? new Set(["ready", "pending_review"])
         : new Set(["ready"]);
 
-      return rows
-        .filter(
-          (row) =>
-            row.album_id === albumId &&
-            row.deleted_at === null &&
-            visibleStatuses.has(row.status) &&
-            (uploadedBy === undefined || row.uploaded_by === uploadedBy) &&
-            (beforeSortOrder === undefined || row.sort_order < beforeSortOrder),
-        )
-        .sort((a, b) => b.sort_order - a.sort_order)
-        .slice(0, limit);
+      return (
+        rows
+          .filter(
+            (row) =>
+              row.album_id === albumId &&
+              row.deleted_at === null &&
+              visibleStatuses.has(row.status) &&
+              (uploadedBy === undefined || row.uploaded_by === uploadedBy) &&
+              (before === undefined ||
+                row.sort_order < before.sortOrder ||
+                (row.sort_order === before.sortOrder && row.id < before.id)),
+          )
+          // Mesmo desempate que a consulta real: sem ele, o adaptador
+          // falso teria uma ordem que o Postgres não garante.
+          .sort((a, b) =>
+            b.sort_order !== a.sort_order
+              ? b.sort_order - a.sort_order
+              : b.id < a.id
+                ? -1
+                : b.id > a.id
+                  ? 1
+                  : 0,
+          )
+          .slice(0, limit)
+      );
     },
     async countVisibleForAlbum({ albumId, canModerate, uploadedBy }) {
       const visibleStatuses = canModerate

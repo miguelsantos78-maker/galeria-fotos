@@ -85,16 +85,16 @@ export function PhotoGrid({
 
   const query = useInfiniteQuery({
     queryKey: ["albums", albumId, "photos", { onlyMine }],
-    queryFn: ({ pageParam }: { pageParam: number | undefined }) => {
+    queryFn: ({ pageParam }: { pageParam: string | undefined }) => {
       const params = new URLSearchParams();
-      if (pageParam !== undefined) params.set("cursor", String(pageParam));
+      if (pageParam !== undefined) params.set("cursor", pageParam);
       if (onlyMine) params.set("mine", "true");
       const queryString = params.toString();
       return apiFetch<ListPhotosResult>(
         `/api/albums/${albumId}/photos${queryString ? `?${queryString}` : ""}`,
       );
     },
-    initialPageParam: undefined as number | undefined,
+    initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     // Semeada com o que já veio na resolução do link, para a galeria
     // aparecer sem um segundo pedido. Só na vista por omissão: com o

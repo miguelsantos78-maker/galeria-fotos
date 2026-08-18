@@ -6,12 +6,30 @@ type PhotoRow = Database["public"]["Tables"]["photos"]["Row"];
 type PhotoInsert = Database["public"]["Tables"]["photos"]["Insert"];
 type PhotoUpdate = Database["public"]["Tables"]["photos"]["Update"];
 
+/**
+ * Posição exata onde a página anterior terminou.
+ *
+ * `sort_order` sozinho não chega: o valor por omissão é o relógio em
+ * milissegundos (ver migração 0001), por isso fotografias enviadas no
+ * mesmo milissegundo — o que acontece de verdade quando há dezenas de
+ * convidados a enviar ao mesmo tempo — partilham o mesmo valor. Com um
+ * cursor só de `sort_order`, um `< cursor` saltava por cima de todas as
+ * que empatassem com a última da página: desapareciam da galeria, em
+ * silêncio, sem nunca mais serem alcançáveis (ver docs/decisions/0043).
+ *
+ * O `id` serve de desempate e torna a posição única.
+ */
+export interface PhotoCursor {
+  sortOrder: number;
+  id: string;
+}
+
 export interface ListVisiblePhotosInput {
   albumId: string;
   /** Espelha a política RLS "photos_select_visible_via_session" (secção 8). */
   canModerate: boolean;
   limit: number;
-  beforeSortOrder?: number;
+  before?: PhotoCursor;
   /** Só as fotografias enviadas por este utilizador (filtro "as minhas"). */
   uploadedBy?: string;
 }
@@ -126,7 +144,7 @@ export function createPhotosRepository(
       albumId,
       canModerate,
       limit,
-      beforeSortOrder,
+      before,
       uploadedBy,
     }) {
       let query = db
@@ -143,12 +161,20 @@ export function createPhotosRepository(
         query = query.eq("uploaded_by", uploadedBy);
       }
 
-      if (beforeSortOrder !== undefined) {
-        query = query.lt("sort_order", beforeSortOrder);
+      if (before !== undefined) {
+        // Comparação por par (sort_order, id), na forma que o PostgREST
+        // consegue exprimir: ou o `sort_order` é menor, ou é igual e o
+        // `id` desempata. Sem o segundo ramo, as fotografias empatadas
+        // com a última da página anterior eram saltadas.
+        query = query.or(
+          `sort_order.lt.${before.sortOrder},` +
+            `and(sort_order.eq.${before.sortOrder},id.lt.${before.id})`,
+        );
       }
 
       const { data, error } = await query
         .order("sort_order", { ascending: false })
+        .order("id", { ascending: false })
         .limit(limit);
 
       if (error) throw toPostgrestError(error);

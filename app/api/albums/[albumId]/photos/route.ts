@@ -23,7 +23,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     const { albumId } = await params;
     const { searchParams } = new URL(request.url);
 
-    const cursor = parseOptionalInt(searchParams.get("cursor"));
+    const cursor = searchParams.get("cursor") ?? undefined;
     const limit = parseOptionalInt(searchParams.get("limit"));
     const onlyMine = searchParams.get("mine") === "true";
 

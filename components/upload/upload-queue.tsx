@@ -219,7 +219,7 @@ export function UploadQueue({ albumId }: { albumId: string }) {
         activeCountRef.current -= 1;
       }
     },
-    [albumId, queryClient, updateItem],
+    [albumId, updateItem, refreshGalleryDebounced],
   );
 
   // Backpressure da fila: no máximo 3 envios em simultâneo (secção 16).

@@ -224,4 +224,63 @@ describe("listPhotosForViewer", () => {
     expect(result.photos[0].isMine).toBe(true);
     expect(result.totalCount).toBe(1);
   });
+
+  it("não perde fotografias que partilham o mesmo sort_order entre páginas", async () => {
+    // O cenário real: `sort_order` tem por omissão o relógio em
+    // milissegundos, e dezenas de convidados a enviar ao mesmo tempo
+    // produzem empates. Com um cursor só de `sort_order`, o `< cursor`
+    // da página seguinte saltava por cima de todas as empatadas com a
+    // última da página anterior — desapareciam da galeria em silêncio.
+    const sessions = createFakeAlbumSessionsRepository([
+      makeAlbumSessionRow({ permissions: ["view"] }),
+    ]);
+    const TOTAL = 12;
+    const photos = createFakePhotosRepository(
+      Array.from({ length: TOTAL }, (_, index) =>
+        makePhotoRow({
+          album_id: "album-1",
+          status: "ready",
+          // Três fotografias por milissegundo.
+          sort_order: 1_000_000 - Math.floor(index / 3),
+        }),
+      ),
+    );
+
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < 10; page++) {
+      const result = await listPhotosForViewer(
+        "album-1",
+        "user-1",
+        { limit: 5, cursor },
+        { sessions, photos, createSignedUrls: fakeSignedUrls },
+      );
+      seen.push(...result.photos.map((photo) => photo.id));
+      if (!result.nextCursor) break;
+      cursor = result.nextCursor;
+    }
+
+    expect(new Set(seen).size).toBe(TOTAL);
+    // E sem repetir nenhuma pelo caminho.
+    expect(seen).toHaveLength(TOTAL);
+  });
+
+  it("um cursor inválido devolve a primeira página em vez de rebentar", async () => {
+    const sessions = createFakeAlbumSessionsRepository([
+      makeAlbumSessionRow({ permissions: ["view"] }),
+    ]);
+    const photos = createFakePhotosRepository([
+      makePhotoRow({ album_id: "album-1", status: "ready" }),
+    ]);
+
+    for (const cursor of ["lixo", "123", "abc_def", "1_foto,bar"]) {
+      const result = await listPhotosForViewer(
+        "album-1",
+        "user-1",
+        { limit: 5, cursor },
+        { sessions, photos, createSignedUrls: fakeSignedUrls },
+      );
+      expect(result.photos).toHaveLength(1);
+    }
+  });
 });

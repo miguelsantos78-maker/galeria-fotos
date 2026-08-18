@@ -45,7 +45,7 @@ const RESOLVED_ALBUM = {
   // testes que precisam de fotografias substituem isto via `overrides`.
   initialPhotos: {
     photos: [] as ReturnType<typeof photoRow>[],
-    nextCursor: null as number | null,
+    nextCursor: null as string | null,
     totalCount: 0,
   },
 };
